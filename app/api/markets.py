@@ -8,7 +8,7 @@ from app.schemas.market import MarketCreate, MarketUpdate, MarketInDB, MarketWit
 from app.core.settlement import process_market_settlement
 from app.core.pi_payments import process_market_rewards, process_pending_transactions
 from app.core.web3_service import Web3Service
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN
 import os
 
@@ -61,8 +61,11 @@ async def create_market(
     """
     Create a new prediction market (requires admin approval).
     """
+    # Get current UTC time as timezone-aware datetime
+    now = datetime.now(timezone.utc)
+    
     # Validate market timing
-    if datetime.utcnow() >= market.end_time:
+    if now >= market.end_time:
         raise HTTPException(
             status_code=400,
             detail="Market end time must be in the future"
@@ -114,7 +117,7 @@ async def create_market(
             creator_id=current_user.id,
             status=MarketStatus.PENDING,
             metadata={
-                "creation_timestamp": datetime.utcnow().isoformat(),
+                "creation_timestamp": now.isoformat(),
                 "creator_role": current_user.role,
                 "initial_validation": {
                     "end_time_valid": True,
@@ -132,7 +135,7 @@ async def create_market(
         if current_user.role == UserRole.ADMIN:
             db_market.status = MarketStatus.ACTIVE
             db_market.metadata["auto_approved"] = True
-            db_market.metadata["approved_at"] = datetime.utcnow().isoformat()
+            db_market.metadata["approved_at"] = now.isoformat()
             db_market.metadata["approved_by"] = current_user.id
             db_market.metadata["approval_type"] = "auto_admin"
         

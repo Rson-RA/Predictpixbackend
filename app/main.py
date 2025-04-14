@@ -1,12 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware
-from app.api import markets, predictions, admin
+from app.api import markets, predictions, admin, users
 from app.api.auth import router as auth_router
 from app.db.session import get_db
 from app.db.utils import init_db
 import logging
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -33,11 +35,18 @@ app.add_middleware(
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)
 
+# Create static directory if it doesn't exist
+os.makedirs("static/avatars", exist_ok=True)
+
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Include routers with prefixes
 app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
-app.include_router(markets, prefix="/markets", tags=["markets"])
-app.include_router(predictions, prefix="/predictions", tags=["predictions"])
-app.include_router(admin, prefix="/admin", tags=["admin"])
+app.include_router(markets, prefix="/api/markets", tags=["markets"])
+app.include_router(predictions, prefix="/api/predictions", tags=["predictions"])
+app.include_router(admin, prefix="/api/admin", tags=["admin"])
+app.include_router(users, prefix="/api/users", tags=["users"])
 
 @app.on_event("startup")
 async def startup_event():

@@ -12,14 +12,15 @@ class TokenData(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
-    token_type: str
+    token_type: str = "bearer"
     user_id: int
     username: str
-    email: str | None = None
-    phone_number: str | None = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
     role: UserRole
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
 
 class AdminLoginRequest(BaseModel):
     username: str
@@ -30,9 +31,10 @@ class EmailLoginRequest(BaseModel):
     password: str
 
 class UpdateUserRequest(BaseModel):
-    email: EmailStr | None = None
-    phone_number: str | None = None
-    password: str | None = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    password: Optional[str] = None
 
     class Config:
         json_schema_extra = {
@@ -41,4 +43,25 @@ class UpdateUserRequest(BaseModel):
                 "phone_number": "+1234567890",
                 "password": "newpassword123"
             }
-        } 
+        }
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+
+class PiLoginRequest(BaseModel):
+    pi_token: str
+
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    username: Optional[str] = None 

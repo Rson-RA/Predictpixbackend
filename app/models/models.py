@@ -44,11 +44,12 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    pi_user_id = Column(String, unique=True, index=True, nullable=False)
+    pi_user_id = Column(String, unique=True, index=True, nullable=True)  # Allow null for email-based registration
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True, nullable=True)
     phone_number = Column(String, unique=True, index=True, nullable=True)
     hashed_password = Column(String, nullable=True)  # Only required for admin users
+    avatar_url = Column(String, nullable=True)  # URL to user's avatar image
     role = Column(Enum(UserRole), default=UserRole.USER)
     balance = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)

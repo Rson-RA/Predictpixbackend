@@ -1,22 +1,91 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.pi_auth import pi_auth
-from app.core.security import create_access_token, verify_password, get_password_hash
+from app.core.security import create_access_token, verify_password, get_password_hash, oauth2_scheme, SECRET_KEY, ALGORITHM
 from app.db.session import get_db
 from app.models.models import User, UserRole
-from app.schemas.auth import AuthResponse, AdminLoginRequest, EmailLoginRequest, UpdateUserRequest
+from app.schemas.auth import (
+    AuthResponse,
+    EmailLoginRequest,
+    AdminLoginRequest,
+    UpdateUserRequest,
+    SignupRequest,
+    PiLoginRequest
+)
 from app.core.security import get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 import logging
+import jwt
+from jwt.exceptions import InvalidTokenError
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-class EmailLoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+@router.post("/register", response_model=AuthResponse)
+async def register(request: SignupRequest, db: Session = Depends(get_db)):
+    """
+    Register a new user with email and password
+    """
+    logger.debug(f"Attempting to register user with email: {request.email}")
+    
+    # Check if email already exists
+    if db.query(User).filter(User.email == request.email).first():
+        logger.warning(f"Registration failed: Email {request.email} already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Email already registered"
+        )
+    
+    # Generate username if not provided
+    username = request.username or f"user_{request.email.split('@')[0]}"
+    
+    # Check if username already exists
+    if db.query(User).filter(User.username == username).first():
+        logger.warning(f"Registration failed: Username {username} already exists")
+        raise HTTPException(
+            status_code=400,
+            detail="Username already taken"
+        )
+    
+    # Create new user
+    user = User(
+        email=request.email,
+        username=username,
+        hashed_password=get_password_hash(request.password),
+        role=UserRole.USER,
+        is_active=True
+    )
+    
+    try:
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User {user.username} registered successfully")
+        
+        # Create access token
+        access_token = create_access_token(subject=str(user.id))
+        
+        return {
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user_id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "role": user.role,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Registration failed: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to create user account"
+        )
 
 @router.post("/email/login", response_model=AuthResponse)
 async def email_login(credentials: EmailLoginRequest, db: Session = Depends(get_db)):
@@ -67,6 +136,7 @@ async def email_login(credentials: EmailLoginRequest, db: Session = Depends(get_
         "email": user.email,
         "phone_number": user.phone_number,
         "role": user.role,
+        "avatar_url": user.avatar_url,
         "created_at": user.created_at,
         "updated_at": user.updated_at
     }
@@ -205,4 +275,36 @@ async def update_profile(
         "role": current_user.role,
         "created_at": current_user.created_at,
         "updated_at": current_user.updated_at
-    } 
+    }
+
+@router.get("/validate")
+async def validate_token(token: str = Depends(oauth2_scheme)):
+    """
+    Validate the authentication token
+    """
+    try:
+        # Attempt to decode the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token"
+            )
+            
+        # Check token expiration
+        exp = payload.get("exp")
+        if exp is None or datetime.utcfromtimestamp(exp) < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has expired"
+            )
+            
+        return {"status": "valid", "user_id": user_id}
+        
+    except InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token"
+        ) 
