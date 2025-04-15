@@ -19,13 +19,21 @@ class Web3Service:
         with open(contract_path) as f:
             contract_data = json.load(f)
             self.contract_abi = contract_data["abi"]
-            self.contract_address = os.getenv("CONTRACT_ADDRESS")
+            self.contract_address = os.getenv("CONTRACT_ADDRESS", "")
+            # Clean the address by removing any URL fragments or extra parts
+            #.split('#')[0].strip()
+            
+        if not self.contract_address:
+            raise ValueError("CONTRACT_ADDRESS environment variable is not set")
+            
+        if not Web3.is_address(self.contract_address):
+            raise ValueError(f"Invalid contract address format: {self.contract_address}")
         
-        # # Initialize contract
-        # self.contract = self.w3.eth.contract(
-        #     address=self.contract_address,
-        #     abi=self.contract_abi
-        # )
+        # Initialize contract
+        self.contract = self.w3.eth.contract(
+            address=self.contract_address,
+            abi=self.contract_abi
+        )
 
     def create_market(
         self,
@@ -65,7 +73,7 @@ class Web3Service:
         signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key
         )
-        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
         
         # Wait for transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -111,7 +119,7 @@ class Web3Service:
         signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key
         )
-        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
         
         # Wait for transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -147,7 +155,7 @@ class Web3Service:
         signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key
         )
-        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
         
         # Wait for transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -181,7 +189,7 @@ class Web3Service:
         signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key
         )
-        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+        tx_hash = self.w3.eth.send_raw_transaction(signed_txn.raw_transaction)
         
         # Wait for transaction receipt
         receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)

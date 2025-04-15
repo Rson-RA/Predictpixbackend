@@ -8,6 +8,9 @@ from app.db.session import get_db
 from app.db.utils import init_db
 import logging
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(

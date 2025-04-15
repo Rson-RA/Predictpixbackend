@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     WEB3_PROVIDER_URL: str
     CONTRACT_ADDRESS: str
     ADMIN_PRIVATE_KEY: str
+    INFURA_API_KEY: str
 
     # Admin user settings
     ADMIN_USERNAME: str = "admin"
