@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, JSON, Text, DateTime, Numeric
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from app.models.base import Base
 import enum
 from datetime import datetime
@@ -26,13 +27,16 @@ class PredictionStatus(str, enum.Enum):
     LOST = "lost"
     CANCELLED = "cancelled"
 
+class TransactionStatus(str, enum.Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
 class TransactionType(str, enum.Enum):
     DEPOSIT = "deposit"
     WITHDRAWAL = "withdrawal"
+    REWARD = "reward"
     PREDICTION = "prediction"
-    WINNINGS = "winnings"
-    REFUND = "refund"
-    FEE = "fee"
 
 class RewardStatus(str, enum.Enum):
     PENDING = "pending"
@@ -78,12 +82,39 @@ class PredictionMarket(Base):
     correct_outcome = Column(String)  # Will be either "YES" or "NO"
     creator_fee_percentage = Column(Float, default=1.0)
     platform_fee_percentage = Column(Float, default=2.0)
-    market_metadata = Column(JSON)
+    market_metadata = Column(JSON, default=dict)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     creator = relationship("User", back_populates="created_markets")
     predictions = relationship("Prediction", back_populates="market")
     rewards = relationship("Reward", back_populates="market")
+
+    def to_dict(self):
+        """Convert market to dictionary with proper metadata handling"""
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "creator_id": self.creator_id,
+            "end_time": self.end_time,
+            "resolution_time": self.resolution_time,
+            "status": self.status,
+            "total_pool": self.total_pool,
+            "yes_pool": self.yes_pool,
+            "no_pool": self.no_pool,
+            "correct_outcome": self.correct_outcome,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "creator_fee_percentage": self.creator_fee_percentage,
+            "platform_fee_percentage": self.platform_fee_percentage,
+            "market_metadata": dict(self.market_metadata) if self.market_metadata else {},
+            "creator": {
+                "id": self.creator.id,
+                "username": self.creator.username
+            } if self.creator else None
+        }
 
 class Prediction(Base):
     __tablename__ = "predictions"
@@ -106,12 +137,14 @@ class Transaction(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    type = Column(Enum(TransactionType))
-    amount = Column(Float, nullable=False)
-    status = Column(String)  # pending, completed, failed
+    amount = Column(Float)
+    status = Column(String, default=TransactionStatus.PENDING)
+    transaction_type = Column(String)
     tx_hash = Column(String)  # Pi Network transaction hash
     reference_id = Column(String)  # Reference to prediction/market ID
     transaction_metadata = Column(JSON)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
     user = relationship("User", back_populates="transactions")

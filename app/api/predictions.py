@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.core.security import get_current_active_user
 from app.db.session import get_db
 from app.models.models import User, Prediction, PredictionMarket, MarketStatus, PredictionStatus
-from app.schemas.prediction import PredictionCreate, PredictionInDB, PredictionWithMarket
+from app.schemas.prediction import PredictionCreate, PredictionInDB, PredictionWithMarket, PredictionFilter
 from app.core.config import settings
 
 router = APIRouter()
@@ -70,36 +70,89 @@ async def create_prediction(
 async def list_predictions(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
-    market_id: int | None = None,
-    status: PredictionStatus | None = None,
+    filters: PredictionFilter = Depends(),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    List user's predictions with optional filtering.
+    List predictions with optional filtering.
     """
-    query = db.query(Prediction).filter(Prediction.user_id == current_user.id)
-    
-    if market_id:
-        query = query.filter(Prediction.market_id == market_id)
-    
+    query = db.query(Prediction)\
+        .options(joinedload(Prediction.market))\
+        .order_by(Prediction.created_at.desc())
+
+    # Apply filters
+    if filters.user_id:
+        query = query.filter(Prediction.user_id == filters.user_id)
+    if filters.market_id:
+        query = query.filter(Prediction.market_id == filters.market_id)
+    if filters.status:
+        query = query.filter(Prediction.status == filters.status)
+    if filters.predicted_outcome:
+        query = query.filter(Prediction.predicted_outcome == filters.predicted_outcome)
+
+    # Get total count
+    total_count = query.count()
+
+    # Apply pagination
+    predictions = query.offset(skip).limit(limit).all()
+
+    # Convert to response format
+    result = []
+    for prediction in predictions:
+        prediction_dict = {
+            "id": prediction.id,
+            "user_id": prediction.user_id,
+            "market_id": prediction.market_id,
+            "amount": prediction.amount,
+            "predicted_outcome": prediction.predicted_outcome,
+            "status": prediction.status,
+            "metadata": prediction.metadata,
+            "created_at": prediction.created_at,
+            "updated_at": prediction.updated_at,
+            "market": prediction.market
+        }
+        result.append(prediction_dict)
+
+    return result
+
+@router.get("/my", response_model=List[PredictionWithMarket])
+async def list_my_predictions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=100),
+    status: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    List predictions for the current user with optional status filtering.
+    """
+    query = db.query(Prediction)\
+        .options(joinedload(Prediction.market))\
+        .filter(Prediction.user_id == current_user.id)\
+        .order_by(Prediction.created_at.desc())
+
     if status:
         query = query.filter(Prediction.status == status)
-    
+
     predictions = query.offset(skip).limit(limit).all()
     
-    # Add market information to predictions
     result = []
-    for pred in predictions:
-        market = pred.market
-        pred_dict = PredictionInDB.model_validate(pred).model_dump()
-        pred_dict.update({
-            "market_title": market.title,
-            "market_status": market.status,
-            "market_end_time": market.end_time
-        })
-        result.append(PredictionWithMarket(**pred_dict))
-    
+    for prediction in predictions:
+        prediction_dict = {
+            "id": prediction.id,
+            "user_id": prediction.user_id,
+            "market_id": prediction.market_id,
+            "amount": prediction.amount,
+            "predicted_outcome": prediction.predicted_outcome,
+            "status": prediction.status,
+            "metadata": prediction.metadata,
+            "created_at": prediction.created_at,
+            "updated_at": prediction.updated_at,
+            "market": prediction.market
+        }
+        result.append(prediction_dict)
+
     return result
 
 @router.get("/{prediction_id}", response_model=PredictionWithMarket)

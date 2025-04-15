@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
+from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict
 from app.core.security import get_current_active_user, get_current_admin_user
 from app.db.session import get_db
-from app.models.models import User, PredictionMarket, MarketStatus, UserRole, Prediction
-from app.schemas.market import MarketCreate, MarketUpdate, MarketInDB, MarketWithStats
+from app.models.models import User, PredictionMarket, MarketStatus, UserRole, Prediction, Reward
+from app.schemas.market import MarketCreate, MarketUpdate, MarketInDB, MarketWithStats, MarketReject
 from app.core.settlement import process_market_settlement
 from app.core.pi_payments import process_market_rewards, process_pending_transactions
 from app.core.web3_service import Web3Service
@@ -50,6 +50,51 @@ def calculate_market_odds(market: PredictionMarket) -> dict:
             "YES": round(yes_prob * 100, 2),
             "NO": round(no_prob * 100, 2)
         }
+    }
+
+def convert_market_to_dict(market: PredictionMarket) -> dict:
+    """Helper function to convert market to dictionary with proper metadata handling"""
+    creator_info = {
+        "creator": {
+            "id": market.creator.id,
+            "username": market.creator.username
+        } if market.creator else {
+            "id": None,
+            "username": "Unknown"
+        }
+    }
+    
+    # Convert SQLAlchemy model to dict, explicitly handling metadata
+    metadata = {}
+    if market.market_metadata is not None:
+        if isinstance(market.market_metadata, dict):
+            metadata = market.market_metadata
+        else:
+            # Handle SQLAlchemy JSON type or other object types
+            try:
+                metadata = dict(market.market_metadata)
+            except (TypeError, ValueError):
+                # If conversion fails, try to get the raw value
+                metadata = market.market_metadata._asdict() if hasattr(market.market_metadata, '_asdict') else {}
+    
+    return {
+        "id": market.id,
+        "title": market.title,
+        "description": market.description,
+        "creator_id": market.creator_id,
+        "end_time": market.end_time,
+        "resolution_time": market.resolution_time,
+        "status": market.status,
+        "total_pool": market.total_pool,
+        "yes_pool": market.yes_pool,
+        "no_pool": market.no_pool,
+        "correct_outcome": market.correct_outcome,
+        "created_at": market.created_at,
+        "updated_at": market.updated_at,
+        "creator_fee_percentage": market.creator_fee_percentage,
+        "platform_fee_percentage": market.platform_fee_percentage,
+        "market_metadata": metadata,
+        **creator_info
     }
 
 @router.post("/", response_model=MarketInDB)
@@ -110,39 +155,42 @@ async def create_market(
             platform_fee_percentage=int(market.platform_fee_percentage),
             private_key=os.getenv("ADMIN_PRIVATE_KEY")  # Admin key for market creation
         )
+        # blockchain_result = {
+        #     "market_id": 1,
+        #     "transaction_hash": "0x1234567890abcdef",
+        #     "block_number": 1234567890
+        # }
         
         # Create market in database
+        market_data = market.model_dump()
+        market_metadata = {
+            "creation_timestamp": now.isoformat(),
+            "creator_role": current_user.role,
+            "initial_validation": {
+                "end_time_valid": True,
+                "resolution_time_valid": True
+            },
+            "blockchain": {
+                "market_id": blockchain_result["market_id"],
+                "transaction_hash": blockchain_result["transaction_hash"],
+                "block_number": blockchain_result["block_number"]
+            }
+        }
+        
         db_market = PredictionMarket(
-            **market.model_dump(),
+            **market_data,
             creator_id=current_user.id,
             status=MarketStatus.PENDING,
-            metadata={
-                "creation_timestamp": now.isoformat(),
-                "creator_role": current_user.role,
-                "initial_validation": {
-                    "end_time_valid": True,
-                    "resolution_time_valid": True
-                },
-                "blockchain": {
-                    "market_id": blockchain_result["market_id"],
-                    "transaction_hash": blockchain_result["transaction_hash"],
-                    "block_number": blockchain_result["block_number"]
-                }
-            }
+            market_metadata=market_metadata
         )
-        
-        # Auto-approve if creator is admin
-        if current_user.role == UserRole.ADMIN:
-            db_market.status = MarketStatus.ACTIVE
-            db_market.metadata["auto_approved"] = True
-            db_market.metadata["approved_at"] = now.isoformat()
-            db_market.metadata["approved_by"] = current_user.id
-            db_market.metadata["approval_type"] = "auto_admin"
         
         db.add(db_market)
         db.commit()
         db.refresh(db_market)
-        return db_market
+        
+        # Convert to response format
+        response_data = db_market.to_dict()
+        return response_data
         
     except Exception as e:
         raise HTTPException(
@@ -161,38 +209,44 @@ async def list_markets(
     """
     List prediction markets with optional filtering.
     """
-    query = db.query(PredictionMarket)
+    query = db.query(PredictionMarket)\
+        .options(joinedload(PredictionMarket.creator))\
+        .order_by(PredictionMarket.created_at.desc())
+    
     if status:
         query = query.filter(PredictionMarket.status == status)
     
     markets = query.offset(skip).limit(limit).all()
-    
-    # Add statistics for each market
     result = []
+    
     for market in markets:
-        # Calculate basic stats
-        stats = {
-            "total_predictions": len(market.predictions),
-            "user_prediction_amount": None,
-            "user_predicted_outcome": None
-        }
+        # Get total predictions for this market
+        total_predictions = len(market.predictions)
         
         # Get user's prediction if exists
         user_prediction = next(
             (p for p in market.predictions if p.user_id == current_user.id),
             None
         )
-        if user_prediction:
-            stats["user_prediction_amount"] = user_prediction.amount
-            stats["user_predicted_outcome"] = user_prediction.predicted_outcome
         
-        # Calculate current odds
+        # Get total markets by creator
+        total_markets_by_creator = db.query(PredictionMarket)\
+            .filter(PredictionMarket.creator_id == market.creator_id)\
+            .count()
+        
+        # Calculate odds
         odds_data = calculate_market_odds(market)
-        stats.update(odds_data)
         
-        market_dict = MarketInDB.model_validate(market).model_dump()
-        market_dict.update(stats)
-        result.append(MarketWithStats(**market_dict))
+        # Convert market to dict and add stats
+        market_dict = market.to_dict()
+        market_dict.update({
+            "total_predictions": total_predictions,
+            "user_prediction_amount": user_prediction.amount if user_prediction else None,
+            "user_predicted_outcome": user_prediction.predicted_outcome if user_prediction else None,
+            "total_markets_by_creator": total_markets_by_creator,
+            **odds_data
+        })
+        result.append(market_dict)
     
     return result
 
@@ -205,29 +259,42 @@ async def get_market(
     """
     Get detailed information about a specific market.
     """
-    market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
+    market = db.query(PredictionMarket)\
+        .options(joinedload(PredictionMarket.creator))\
+        .filter(PredictionMarket.id == market_id)\
+        .first()
+    
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
     
-    # Get statistics
-    stats = {
-        "total_predictions": len(market.predictions),
-        "user_prediction_amount": None,
-        "user_predicted_outcome": None
-    }
+    # Get total predictions for this market
+    total_predictions = len(market.predictions)
     
     # Get user's prediction if exists
     user_prediction = next(
         (p for p in market.predictions if p.user_id == current_user.id),
         None
     )
-    if user_prediction:
-        stats["user_prediction_amount"] = user_prediction.amount
-        stats["user_predicted_outcome"] = user_prediction.predicted_outcome
     
-    market_dict = MarketInDB.model_validate(market).model_dump()
-    market_dict.update(stats)
-    return MarketWithStats(**market_dict)
+    # Get total markets by creator
+    total_markets_by_creator = db.query(PredictionMarket)\
+        .filter(PredictionMarket.creator_id == market.creator_id)\
+        .count()
+    
+    # Calculate odds
+    odds_data = calculate_market_odds(market)
+    
+    # Convert market to dict and add stats
+    market_dict = market.to_dict()
+    market_dict.update({
+        "total_predictions": total_predictions,
+        "user_prediction_amount": user_prediction.amount if user_prediction else None,
+        "user_predicted_outcome": user_prediction.predicted_outcome if user_prediction else None,
+        "total_markets_by_creator": total_markets_by_creator,
+        **odds_data
+    })
+    
+    return market_dict
 
 @router.put("/{market_id}", response_model=MarketInDB)
 async def update_market(
@@ -244,12 +311,25 @@ async def update_market(
         raise HTTPException(status_code=404, detail="Market not found")
     
     # Update market fields
-    for field, value in market_update.model_dump(exclude_unset=True).items():
+    update_data = market_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(db_market, field, value)
+    
+    # Update metadata with update information
+    now = datetime.now(timezone.utc)
+    current_metadata = db_market.market_metadata or {}
+    db_market.market_metadata = {
+        **current_metadata,
+        "last_update": {
+            "updated_at": now.isoformat(),
+            "updated_by": current_user.id,
+            "updated_fields": list(update_data.keys())
+        }
+    }
     
     db.commit()
     db.refresh(db_market)
-    return db_market
+    return db_market.to_dict()
 
 @router.post("/{market_id}/predict", response_model=Dict)
 async def place_prediction(
@@ -275,7 +355,7 @@ async def place_prediction(
     try:
         # Place prediction on blockchain
         blockchain_result = web3_service.place_prediction(
-            market_id=db_market.metadata["blockchain"]["market_id"],
+            market_id=db_market.market_metadata["blockchain"]["market_id"],
             predicted_outcome=predicted_outcome,
             amount=amount,
             private_key=current_user.private_key  # User's private key for prediction
@@ -345,7 +425,7 @@ async def resolve_market(
     try:
         # Resolve market on blockchain
         blockchain_result = web3_service.resolve_market(
-            market_id=db_market.metadata["blockchain"]["market_id"],
+            market_id=db_market.market_metadata["blockchain"]["market_id"],
             outcome=correct_outcome == "YES",
             private_key=os.getenv("ADMIN_PRIVATE_KEY")  # Admin key for resolution
         )
@@ -361,8 +441,8 @@ async def resolve_market(
         background_tasks.add_task(process_pending_transactions, db)
         
         # Update market metadata with settlement information
-        db_market.metadata = {
-            **db_market.metadata,
+        db_market.market_metadata = {
+            **db_market.market_metadata,
             "settlement": {
                 "resolved_at": datetime.utcnow().isoformat(),
                 "resolved_by": current_user.id,
@@ -406,7 +486,7 @@ async def claim_rewards(
     try:
         # Claim rewards on blockchain
         blockchain_result = web3_service.claim_reward(
-            market_id=db_market.metadata["blockchain"]["market_id"],
+            market_id=db_market.market_metadata["blockchain"]["market_id"],
             private_key=current_user.private_key  # User's private key for claiming
         )
         
@@ -445,4 +525,131 @@ async def get_market_transactions(
             "metadata": tx.metadata
         }
         for tx in transactions
-    ] 
+    ]
+
+@router.post("/{market_id}/approve", response_model=MarketInDB)
+async def approve_market(
+    market_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Approve a pending market (admin only).
+    """
+    db_market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
+    if not db_market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    
+    if db_market.status != MarketStatus.PENDING:
+        raise HTTPException(status_code=400, detail="Only pending markets can be approved")
+    
+    try:
+        # Update market status
+        db_market.status = MarketStatus.ACTIVE
+        
+        # Update metadata with approval information
+        now = datetime.now(timezone.utc)
+        current_metadata = db_market.market_metadata or {}
+        db_market.market_metadata = {
+            **current_metadata,
+            "approval": {
+                "approved_at": now.isoformat(),
+                "approved_by": current_user.id,
+                "approver_role": current_user.role
+            }
+        }
+        
+        db.commit()
+        db.refresh(db_market)
+        return db_market.to_dict()
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to approve market: {str(e)}"
+        )
+
+@router.post("/{market_id}/reject", response_model=MarketInDB)
+async def reject_market(
+    market_id: int,
+    reject_data: MarketReject,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Reject a pending market (admin only).
+    """
+    db_market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
+    if not db_market:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Market not found"
+        )
+    
+    if db_market.status != MarketStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only pending markets can be rejected"
+        )
+    
+    try:
+        # Update market status
+        db_market.status = MarketStatus.CANCELLED
+        
+        # Update metadata with rejection information
+        now = datetime.now(timezone.utc)
+        current_metadata = db_market.market_metadata or {}
+        db_market.market_metadata = {
+            **current_metadata,
+            "rejected_at": now.isoformat(),
+            "rejected_by": current_user.id,
+            "rejection_reason": reject_data.reason
+        }
+        
+        db.commit()
+        db.refresh(db_market)
+        return db_market.to_dict()
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reject market: {str(e)}"
+        )
+
+@router.delete("/{market_id}", response_model=Dict)
+async def delete_market(
+    market_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Delete a market and all its related data (admin only).
+    """
+    db_market = db.query(PredictionMarket).filter(PredictionMarket.id == market_id).first()
+    if not db_market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    
+    try:
+        # Delete all predictions for this market
+        db.query(Prediction).filter(Prediction.market_id == market_id).delete()
+        
+        # Delete all rewards for this market
+        db.query(Reward).filter(Reward.market_id == market_id).delete()
+        
+        # Delete the market itself
+        db.delete(db_market)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Market {market_id} and all related data have been deleted"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete market: {str(e)}"
+        ) 

@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware
-from app.api import markets, predictions, admin, users
-from app.api.auth import router as auth_router
+from app.api.v1.api import api_router
 from app.db.session import get_db
 from app.db.utils import init_db
 import logging
@@ -20,7 +19,8 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Cryptocurrency prediction betting platform powered by Pi Network"
+    description="Cryptocurrency prediction betting platform powered by Pi Network",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
 # CORS middleware configuration
@@ -41,12 +41,8 @@ os.makedirs("static/avatars", exist_ok=True)
 # Mount static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Include routers with prefixes
-app.include_router(auth_router, prefix="/api/auth", tags=["authentication"])
-app.include_router(markets, prefix="/api/markets", tags=["markets"])
-app.include_router(predictions, prefix="/api/predictions", tags=["predictions"])
-app.include_router(admin, prefix="/api/admin", tags=["admin"])
-app.include_router(users, prefix="/api/users", tags=["users"])
+# Include API router
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():

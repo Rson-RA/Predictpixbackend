@@ -1,11 +1,19 @@
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from datetime import datetime
 from app.core.security import get_current_active_user
 from app.core.pi_auth import pi_auth
 from app.db.session import get_db
 from app.models.models import User, Transaction, TransactionType
-from app.schemas.transaction import TransactionCreate, TransactionInDB, TransactionWithUser
+from app.schemas.transaction import (
+    TransactionCreate,
+    TransactionUpdate,
+    TransactionInDB,
+    TransactionWithUser,
+    TransactionFilter
+)
+from app.crud import transaction as crud_transaction
 
 router = APIRouter()
 
@@ -92,42 +100,54 @@ async def create_withdrawal(
             detail=f"Failed to create withdrawal: {str(e)}"
         )
 
-@router.get("/", response_model=List[TransactionInDB])
-async def list_transactions(
+@router.get("/", response_model=List[TransactionWithUser])
+def get_transactions(
+    user_id: Optional[int] = None,
+    status: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    transaction_type: Optional[TransactionType] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
-    transaction_type: TransactionType | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    List user's transactions with optional filtering.
+    Get all transactions with optional filtering.
+    Only admin users can see all transactions, regular users can only see their own.
     """
-    query = db.query(Transaction).filter(Transaction.user_id == current_user.id)
+    filters = TransactionFilter(
+        user_id=user_id,
+        status=status,
+        start_date=start_date,
+        end_date=end_date,
+        type=transaction_type
+    )
     
-    if transaction_type:
-        query = query.filter(Transaction.type == transaction_type)
-    
-    transactions = query.order_by(Transaction.created_at.desc()).offset(skip).limit(limit).all()
+    # Regular users can only see their own transactions
+    if not current_user.is_admin:
+        filters.user_id = current_user.id
+        
+    transactions = crud_transaction.get_transactions(db, filters=filters, skip=skip, limit=limit)
     return transactions
 
-@router.get("/{transaction_id}", response_model=TransactionInDB)
-async def get_transaction(
+@router.get("/{transaction_id}", response_model=TransactionWithUser)
+def get_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Get detailed information about a specific transaction.
+    Get a specific transaction by ID.
+    Only admin users can see all transactions, regular users can only see their own.
     """
-    transaction = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.user_id == current_user.id
-    ).first()
-    
-    if not transaction:
+    transaction = crud_transaction.get_transaction(db, transaction_id)
+    if transaction is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    
+        
+    if not current_user.is_admin and transaction.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this transaction")
+        
     return transaction
 
 @router.post("/verify/{transaction_id}", response_model=TransactionInDB)
@@ -139,13 +159,12 @@ async def verify_transaction(
     """
     Verify a pending transaction with Pi Network.
     """
-    transaction = db.query(Transaction).filter(
-        Transaction.id == transaction_id,
-        Transaction.user_id == current_user.id
-    ).first()
-    
-    if not transaction:
+    transaction = crud_transaction.get_transaction(db, transaction_id)
+    if transaction is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    if not current_user.is_admin and transaction.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to verify this transaction")
     
     if transaction.status != "pending":
         raise HTTPException(status_code=400, detail="Transaction is not pending")
@@ -177,4 +196,43 @@ async def verify_transaction(
         raise HTTPException(
             status_code=400,
             detail=f"Transaction verification failed: {str(e)}"
-        ) 
+        )
+
+@router.put("/{transaction_id}", response_model=TransactionWithUser)
+def update_transaction(
+    transaction_id: int,
+    transaction_update: TransactionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Update a transaction.
+    Only admin users can update transactions.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to update transactions")
+        
+    transaction = crud_transaction.update_transaction(db, transaction_id, transaction_update)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    return transaction
+
+@router.delete("/{transaction_id}")
+def delete_transaction(
+    transaction_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Delete a transaction.
+    Only admin users can delete transactions.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to delete transactions")
+        
+    transaction = crud_transaction.delete_transaction(db, transaction_id)
+    if transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    return {"message": "Transaction deleted successfully"} 

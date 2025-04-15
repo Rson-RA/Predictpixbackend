@@ -1,15 +1,17 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 from app.models.models import PredictionStatus
+from app.schemas.market import MarketInDB
 
 class PredictionBase(BaseModel):
-    market_id: int
-    amount: float = Field(gt=0)
+    amount: float
     predicted_outcome: str
+    status: str
+    metadata: Optional[Dict[str, Any]] = None
 
 class PredictionCreate(PredictionBase):
-    pass
+    market_id: int
 
 class PredictionUpdate(BaseModel):
     status: PredictionStatus
@@ -18,8 +20,7 @@ class PredictionUpdate(BaseModel):
 class PredictionInDB(PredictionBase):
     id: int
     user_id: int
-    status: PredictionStatus
-    potential_winnings: Optional[float] = None
+    market_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -27,6 +28,13 @@ class PredictionInDB(PredictionBase):
         from_attributes = True
 
 class PredictionWithMarket(PredictionInDB):
-    market_title: str
-    market_status: str
-    market_end_time: datetime 
+    market: MarketInDB
+
+    class Config:
+        from_attributes = True
+
+class PredictionFilter(BaseModel):
+    user_id: Optional[int] = None
+    market_id: Optional[int] = None
+    status: Optional[str] = None
+    predicted_outcome: Optional[str] = None 

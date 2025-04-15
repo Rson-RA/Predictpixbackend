@@ -1,31 +1,38 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from pydantic import BaseModel
+from typing import Optional
 from datetime import datetime
-from app.models.models import TransactionType
+from app.models.models import TransactionStatus, TransactionType
 
 class TransactionBase(BaseModel):
-    type: TransactionType
-    amount: float = Field(gt=0)
-    reference_id: Optional[str] = None
-    metadata: Optional[Dict] = None
+    amount: float
+    status: str = TransactionStatus.PENDING
+    transaction_type: str
 
 class TransactionCreate(TransactionBase):
-    pass
+    user_id: int
 
 class TransactionUpdate(BaseModel):
-    status: str
-    tx_hash: Optional[str] = None
+    status: Optional[str] = None
+    transaction_type: Optional[str] = None
+    amount: Optional[float] = None
 
 class TransactionInDB(TransactionBase):
     id: int
     user_id: int
-    status: str
-    tx_hash: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 class TransactionWithUser(TransactionInDB):
-    username: str 
+    user: dict
+
+    class Config:
+        from_attributes = True
+
+class TransactionFilter(BaseModel):
+    user_id: Optional[int] = None
+    status: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None 

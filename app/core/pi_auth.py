@@ -96,4 +96,59 @@ class PiNetworkAuth:
                 detail=f"Payment creation error: {str(e)}"
             )
 
+    async def approve_payment(self, payment_id: str) -> dict:
+        """Approve a Pi payment transaction."""
+        try:
+            headers = {
+                "Authorization": f"Key {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/v2/payments/{payment_id}/approve",
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Failed to approve payment"
+                )
+            
+            return response.json()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Payment approval error: {str(e)}"
+            )
+
+    async def cancel_payment(self, payment_id: str, reason: Optional[str] = None) -> dict:
+        """Cancel a Pi payment transaction."""
+        try:
+            headers = {
+                "Authorization": f"Key {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            payload = {"reason": reason} if reason else {}
+            
+            response = requests.post(
+                f"{self.base_url}/v2/payments/{payment_id}/cancel",
+                headers=headers,
+                json=payload
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Failed to cancel payment"
+                )
+            
+            return response.json()
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Payment cancellation error: {str(e)}"
+            )
+
 pi_auth = PiNetworkAuth() 
