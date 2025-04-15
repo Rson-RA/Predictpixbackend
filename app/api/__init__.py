@@ -1,14 +1,14 @@
-from app.api.markets import router as markets_router
-from app.api.predictions import router as predictions_router
-from app.api.auth import router as auth_router  # auth module handles user endpoints
-from app.api.admin import router as admin_router
-from app.api.users import router as users_router
+from fastapi import APIRouter
+from app.api import transactions, markets, auth, users, admin, rewards, predictions
 
-# Export the routers directly
-markets = markets_router
-users = users_router
-predictions = predictions_router
-admin = admin_router
-auth = auth_router
+api_router = APIRouter()
 
-__all__ = ["markets", "users", "predictions", "admin"] 
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(markets.router, prefix="/markets", tags=["markets"])
+api_router.include_router(predictions.router, prefix="/predictions", tags=["predictions"])
+api_router.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
+api_router.include_router(rewards.router, prefix="/rewards", tags=["rewards"])
+api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+__all__ = ["api_router"] 

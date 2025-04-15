@@ -5,7 +5,7 @@ from pydantic import AnyHttpUrl, validator
 class Settings(BaseSettings):
     PROJECT_NAME: str = "PredictPix"
     VERSION: str = "1.0.0"
-    API_V1_STR: str = "/api/v1"
+    API_V1_STR: str = "/api"
     
     # PostgreSQL Database settings
     POSTGRES_SERVER: str

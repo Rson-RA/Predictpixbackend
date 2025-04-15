@@ -10,7 +10,8 @@ from app.schemas.auth import (
     AdminLoginRequest,
     UpdateUserRequest,
     SignupRequest,
-    PiLoginRequest
+    PiLoginRequest,
+    LoginRequest
 )
 from app.core.security import get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
@@ -88,7 +89,7 @@ async def register(request: SignupRequest, db: Session = Depends(get_db)):
         )
 
 @router.post("/email/login", response_model=AuthResponse)
-async def email_login(credentials: EmailLoginRequest, db: Session = Depends(get_db)):
+async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session = Depends(get_db)):
     """
     Login using email and password
     """

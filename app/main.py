@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware
-from app.api.v1.api import api_router
+from app.api import api_router
 from app.db.session import get_db
 from app.db.utils import init_db
 import logging
