@@ -23,7 +23,7 @@ var/
 .venv
 venv/
 .pytest_cache/
-static/
+upload/
 
 # Node/React
 node_modules/

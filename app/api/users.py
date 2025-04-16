@@ -158,13 +158,13 @@ async def update_avatar(
             image = image.convert('RGB')
         
         # Create avatars directory if it doesn't exist
-        avatar_dir = "static/avatars"
+        avatar_dir = "upload/avatars"
         os.makedirs(avatar_dir, exist_ok=True)
         
         # Delete old avatar if exists
         if user.avatar_url:
             try:
-                old_avatar_path = os.path.join("static", user.avatar_url.lstrip("/"))
+                old_avatar_path = os.path.join("upload", user.avatar_url.lstrip("/"))
                 if os.path.exists(old_avatar_path):
                     os.remove(old_avatar_path)
             except Exception:
@@ -180,7 +180,7 @@ async def update_avatar(
         image_rgb.save(avatar_path, "JPEG", quality=85)
         
         # Update user avatar URL
-        user.avatar_url = f"/static/avatars/{avatar_filename}"
+        user.avatar_url = f"/upload/avatars/{avatar_filename}"
         user.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(user)
@@ -219,7 +219,7 @@ async def delete_avatar(
     if user.avatar_url:
         try:
             # Remove the old avatar file
-            avatar_path = os.path.join("static", user.avatar_url.lstrip("/"))
+            avatar_path = os.path.join("upload", user.avatar_url.lstrip("/"))
             if os.path.exists(avatar_path):
                 os.remove(avatar_path)
         except Exception:

@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware
 from app.api import api_router
@@ -38,14 +39,17 @@ app.add_middleware(
 # Rate limiting middleware
 app.add_middleware(RateLimitMiddleware)
 
-# Create static directory if it doesn't exist
-os.makedirs("static/avatars", exist_ok=True)
-
-# Mount static files directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Include API router
+# Include API router first
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Create static directory if it doesn't exist
+os.makedirs("upload/avatars", exist_ok=True)
+
+# Mount static files directory for user uploads
+app.mount("/upload", StaticFiles(directory="upload"), name="upload")
+
+# Mount React static files last
+# app.mount("/", StaticFiles(directory="frontend/build", html=True), name="static")
 
 @app.on_event("startup")
 async def startup_event():
@@ -59,6 +63,14 @@ async def startup_event():
         logger.error(f"Error during startup: {str(e)}")
         raise
 
+# Serve static React files
 @app.get("/")
-async def root():
-    return {"message": "Welcome to PredictPix - Cryptocurrency Prediction Platform"} 
+async def get_react_app():
+    # Return the index.html from the React build folder
+    return FileResponse(os.path.join("frontend", "build", "index.html"))
+
+# # Serve static files (JS, CSS, etc.)
+@app.get("/static/{file_path:path}")
+async def serve_static(type: str, file_path: str):
+    logger.info(f"Serving static file: {file_path}")
+    return FileResponse(os.path.join("frontend", "build", "static", type, file_path))
