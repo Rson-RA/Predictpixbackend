@@ -12,6 +12,7 @@ import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
 import InfoIcon from '@mui/icons-material/Info';
 import StoreIcon from '@mui/icons-material/Store';
 import PersonIcon from '@mui/icons-material/Person';
+import ShareIcon from '@mui/icons-material/Share';
 import { styled } from '@mui/material/styles';
 
 const SideMenuWrapper = styled(Box)(({ theme }) => ({
@@ -48,6 +49,7 @@ const menuItems = [
   { text: 'Predictions', icon: <WidgetsIcon />, path: '/predictions' },
   { text: 'Transactions', icon: <ViewQuiltIcon />, path: '/transactions' },
   { text: 'Rewards', icon: <ViewQuiltIcon />, path: '/rewards' },
+  { text: 'Referrals', icon: <ShareIcon />, path: '/referrals' },
   // { text: 'About', icon: <InfoIcon />, path: '/about' },
 ];
 

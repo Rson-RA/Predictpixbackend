@@ -15,6 +15,7 @@ import Users from './pages/Users';
 import Predictions from './pages/Predictions';
 import Transactions from './pages/Transactions';
 import Rewards from './pages/Rewards';
+import Referrals from './pages/Referrals';
 import ProtectedRoute from './components/ProtectedRoute';
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="predictions" element={<Predictions />} />
               <Route path="transactions" element={<Transactions />} />
               <Route path="rewards" element={<Rewards />} />
+              <Route path="referrals" element={<Referrals />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Routes>

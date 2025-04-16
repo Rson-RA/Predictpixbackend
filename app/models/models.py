@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Enum, JSON, Text, DateTime, Numeric
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql import func
 from app.models.base import Base
 import enum
@@ -37,6 +37,7 @@ class TransactionType(str, enum.Enum):
     WITHDRAWAL = "withdrawal"
     REWARD = "reward"
     PREDICTION = "prediction"
+    REFERRAL = "referral"
 
 class RewardStatus(str, enum.Enum):
     PENDING = "pending"
@@ -59,6 +60,9 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER)
     balance = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
+    referral_code = Column(String, unique=True, index=True)  # Unique referral code for this user
+    referral_earnings = Column(Float, default=0.0)  # Total earnings from referrals
+    referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who referred this user
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -67,6 +71,23 @@ class User(Base):
     transactions = relationship("Transaction", back_populates="user")
     created_markets = relationship("PredictionMarket", back_populates="creator")
     rewards = relationship("Reward", back_populates="user")
+    referrals = relationship(
+        "User",
+        backref=backref("referred_by", remote_side=[id]),
+        primaryjoin="User.id==foreign(User.referred_by_id)",
+        uselist=True
+    )
+    referral_transactions = relationship(
+        "ReferralTransaction",
+        back_populates="user",
+        foreign_keys="[ReferralTransaction.user_id]",
+        primaryjoin="User.id==ReferralTransaction.user_id"
+    )
+    referred_transactions = relationship(
+        "ReferralTransaction",
+        foreign_keys="[ReferralTransaction.referred_user_id]",
+        primaryjoin="User.id==ReferralTransaction.referred_user_id"
+    )
 
 class PredictionMarket(Base):
     __tablename__ = "prediction_markets"
@@ -128,6 +149,8 @@ class Prediction(Base):
     predicted_outcome = Column(String, nullable=False)  # Will be either "YES" or "NO"
     status = Column(Enum(PredictionStatus), default=PredictionStatus.PENDING)
     potential_winnings = Column(Float)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="predictions")
@@ -151,6 +174,7 @@ class Transaction(Base):
     # Relationships
     user = relationship("User", back_populates="transactions")
     reward = relationship("Reward", back_populates="transaction", uselist=False)
+    referral_transaction = relationship("ReferralTransaction", back_populates="transaction", uselist=False)
 
 class Reward(Base):
     __tablename__ = "rewards"
@@ -167,9 +191,33 @@ class Reward(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     processed_at = Column(DateTime, nullable=True)
     reward_metadata = Column(JSON, nullable=True)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="rewards")
     prediction = relationship("Prediction", back_populates="reward")
     market = relationship("PredictionMarket", back_populates="rewards")
-    transaction = relationship("Transaction", back_populates="reward") 
+    transaction = relationship("Transaction", back_populates="reward")
+
+class ReferralTransaction(Base):
+    __tablename__ = "referral_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # User who earned the referral bonus
+    referred_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # User who was referred
+    amount = Column(Float, nullable=False)  # Amount earned from this referral
+    transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=True)  # Associated transaction
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship(
+        "User",
+        foreign_keys=[user_id],
+        back_populates="referral_transactions"
+    )
+    referred_user = relationship(
+        "User",
+        foreign_keys=[referred_user_id],
+        back_populates="referred_transactions"
+    )
+    transaction = relationship("Transaction", back_populates="referral_transaction") 

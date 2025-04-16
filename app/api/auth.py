@@ -20,73 +20,64 @@ import logging
 import jwt
 from jwt.exceptions import InvalidTokenError
 from datetime import datetime, timedelta
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 @router.post("/register", response_model=AuthResponse)
-async def register(request: SignupRequest, db: Session = Depends(get_db)):
-    """
-    Register a new user with email and password
-    """
-    logger.debug(f"Attempting to register user with email: {request.email}")
-    
-    # Check if email already exists
-    if db.query(User).filter(User.email == request.email).first():
-        logger.warning(f"Registration failed: Email {request.email} already exists")
+async def register(
+    user_data: SignupRequest,
+    referral_code: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Register a new user."""
+    # Check if user exists
+    if db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered"
         )
-    
-    # Generate username if not provided
-    username = request.username or f"user_{request.email.split('@')[0]}"
-    
-    # Check if username already exists
-    if db.query(User).filter(User.username == username).first():
-        logger.warning(f"Registration failed: Username {username} already exists")
-        raise HTTPException(
-            status_code=400,
-            detail="Username already taken"
-        )
-    
+
+    # Check referral code if provided
+    referrer = None
+    if referral_code:
+        referrer = db.query(User).filter(User.referral_code == referral_code).first()
+        if not referrer:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid referral code"
+            )
+
     # Create new user
-    user = User(
-        email=request.email,
-        username=username,
-        hashed_password=get_password_hash(request.password),
-        role=UserRole.USER,
-        is_active=True
+    hashed_password = get_password_hash(user_data.password)
+    db_user = User(
+        **user_data.dict(exclude={'password'}),
+        hashed_password=hashed_password,
+        referred_by_id=referrer.id if referrer else None
     )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # Process referral if applicable
+    if referrer:
+        await process_referral(db, db_user, referrer)
+
+    # Create access token
+    access_token = create_access_token(data={"sub": db_user.email})
     
-    try:
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"User {user.username} registered successfully")
-        
-        # Create access token
-        access_token = create_access_token(subject=str(user.id))
-        
-        return {
-            "access_token": access_token,
-            "token_type": "bearer",
-            "user_id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "phone_number": user.phone_number,
-            "role": user.role,
-            "created_at": user.created_at,
-            "updated_at": user.updated_at
-        }
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Registration failed: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to create user account"
-        )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user_id": db_user.id,
+        "username": db_user.username,
+        "email": db_user.email,
+        "role": db_user.role,
+        "created_at": db_user.created_at,
+        "updated_at": db_user.updated_at
+    }
 
 @router.post("/email/login", response_model=AuthResponse)
 async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session = Depends(get_db)):

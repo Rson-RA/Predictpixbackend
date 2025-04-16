@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@predictpix.com"
     ADMIN_PASSWORD: str = "password"
 
+    # Referral Settings
+    REFERRAL_BONUS_AMOUNT: float = 5.0  # Amount earned per referral
+    FRONTEND_URL: str = "http://localhost:3000"  # Frontend URL for referral links
+
     class Config:
         case_sensitive = True
         env_file = ".env"
