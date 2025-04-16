@@ -9,6 +9,8 @@ class UserBase(BaseModel):
     role: str
     is_active: bool
     avatar_url: Optional[str] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -20,6 +22,8 @@ class UserUpdate(BaseModel):
     role: Optional[str] = None
     is_active: Optional[bool] = None
     avatar_url: Optional[str] = None
+    firstname: Optional[str] = None
+    lastname: Optional[str] = None
 
 class UserResponse(UserBase):
     id: int

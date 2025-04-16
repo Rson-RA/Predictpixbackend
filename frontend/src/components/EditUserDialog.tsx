@@ -36,7 +36,9 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ open, onClose, onSave, 
     email: '',
     role: 'user',
     is_active: true,
-    avatar_url: null
+    avatar_url: null,
+    firstname: '',
+    lastname: ''
   });
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -55,7 +57,9 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ open, onClose, onSave, 
         email: user.email || '',
         role: user.role,
         is_active: user.is_active,
-        avatar_url: user.avatar_url || null
+        avatar_url: user.avatar_url || null,
+        firstname: user.firstname || '',
+        lastname: user.lastname || ''
       });
       setAvatarPreview(getFullAvatarUrl(user.avatar_url || null));
       setAvatarFile(null);
@@ -167,6 +171,20 @@ const EditUserDialog: React.FC<EditUserDialogProps> = ({ open, onClose, onSave, 
               onChange={handleTextChange}
               fullWidth
               required
+            />
+            <TextField
+              name="firstname"
+              label="First Name"
+              value={formData.firstname}
+              onChange={handleTextChange}
+              fullWidth
+            />
+            <TextField
+              name="lastname"
+              label="Last Name"
+              value={formData.lastname}
+              onChange={handleTextChange}
+              fullWidth
             />
             <TextField
               name="email"

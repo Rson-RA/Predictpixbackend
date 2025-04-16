@@ -52,6 +52,8 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True, nullable=True)
     phone_number = Column(String, unique=True, index=True, nullable=True)
+    firstname = Column(String, nullable=True)
+    lastname = Column(String, nullable=True)
     hashed_password = Column(String, nullable=True)  # Only required for admin users
     avatar_url = Column(String, nullable=True)  # URL to user's avatar image
     role = Column(Enum(UserRole), default=UserRole.USER)

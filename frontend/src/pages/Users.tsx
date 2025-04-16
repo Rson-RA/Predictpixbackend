@@ -65,7 +65,9 @@ const Users = () => {
         username: userData.username,
         email: userData.email || undefined,
         role: userData.role,
-        is_active: userData.is_active
+        is_active: userData.is_active,
+        firstname: userData.firstname || undefined,
+        lastname: userData.lastname || undefined
       };
 
       // Update user data
@@ -122,6 +124,8 @@ const Users = () => {
             <TableRow>
               <TableCell>Avatar</TableCell>
               <TableCell>Username</TableCell>
+              <TableCell>First Name</TableCell>
+              <TableCell>Last Name</TableCell>
               <TableCell>Email</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Status</TableCell>
@@ -142,6 +146,8 @@ const Users = () => {
                   </Avatar>
                 </TableCell>
                 <TableCell>{user.username}</TableCell>
+                <TableCell>{user.firstname || '-'}</TableCell>
+                <TableCell>{user.lastname || '-'}</TableCell>
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   <Chip

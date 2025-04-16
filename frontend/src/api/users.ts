@@ -8,6 +8,8 @@ export interface UserUpdateData {
   role?: string;
   is_active?: boolean;
   avatar_url?: string | null;
+  firstname?: string | null;
+  lastname?: string | null;
 }
 
 // Get all users

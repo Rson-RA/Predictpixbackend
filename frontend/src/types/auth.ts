@@ -3,6 +3,8 @@ export interface User {
   username: string;
   email: string | null;
   pi_user_id?: string;
+  firstname?: string | null;
+  lastname?: string | null;
   role: 'admin' | 'user';
   balance: number;
   is_active: boolean;
