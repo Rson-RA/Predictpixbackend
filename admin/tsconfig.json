@@ -24,7 +24,11 @@
       "@components/*": ["components/*"],
       "@pages/*": ["pages/*"],
       "@types/*": ["types/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ]
   },
   "include": [
     "src"
