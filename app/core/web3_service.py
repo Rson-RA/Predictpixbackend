@@ -19,7 +19,7 @@ class Web3Service:
         with open(contract_path) as f:
             contract_data = json.load(f)
             self.contract_abi = contract_data["abi"]
-            self.contract_address = os.getenv("CONTRACT_ADDRESS", "")
+            self.contract_address = os.getenv("CONTRACT_ADDRESS", "0xcB80F37eDD2bE3570c6C9D5B0888614E04E1e49E")
             # Clean the address by removing any URL fragments or extra parts
             #.split('#')[0].strip()
             

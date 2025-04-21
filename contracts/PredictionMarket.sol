@@ -66,7 +66,7 @@ contract PredictionMarket is Ownable, ReentrancyGuard {
         uint256 amount
     );
 
-    constructor() Ownable() {}
+    constructor() Ownable(msg.sender) {}
 
     function createMarket(
         string memory title,

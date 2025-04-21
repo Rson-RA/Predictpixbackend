@@ -49,7 +49,9 @@ os.makedirs("upload/avatars", exist_ok=True)
 app.mount("/upload", StaticFiles(directory="upload"), name="upload")
 
 # Mount React static files last
-# app.mount("/", StaticFiles(directory="frontend/build", html=True), name="static")
+app.mount("/static", StaticFiles(directory="admin/build/static"), name="static")
+
+app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
 @app.on_event("startup")
 async def startup_event():
@@ -64,13 +66,24 @@ async def startup_event():
         raise
 
 # Serve static React files
-@app.get("/")
+@app.get("/app")
 async def get_react_app():
     # Return the index.html from the React build folder
-    return FileResponse(os.path.join("frontend", "build", "index.html"))
+    return FileResponse(os.path.join("frontend", "dist", "index.html"))
+
+@app.get("/")
+async def get_admin_app():
+    # Return the index.html from the React build folder
+    return FileResponse(os.path.join("admin", "build", "index.html"))
 
 # # Serve static files (JS, CSS, etc.)
-@app.get("/static/{file_path:path}")
-async def serve_static(type: str, file_path: str):
-    logger.info(f"Serving static file: {file_path}")
-    return FileResponse(os.path.join("frontend", "build", "static", type, file_path))
+# @app.get("/static/{file_path:path}")
+# async def serve_static(type: str, file_path: str):
+#     logger.info(f"Serving static file: {file_path}")
+#     return FileResponse(os.path.join("admin", "build", "static", type, file_path))
+
+# # Serve assets files (JS, CSS, etc.)
+# @app.get("/assets/{file_path:path}")
+# async def serve_assets(type: str, file_path: str):
+#     logger.info(f"Serving static file: {file_path}")
+#     return FileResponse(os.path.join("frontend", "dist", "assets", type, file_path))

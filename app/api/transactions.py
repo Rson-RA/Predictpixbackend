@@ -5,7 +5,7 @@ from datetime import datetime
 from app.core.security import get_current_active_user
 from app.core.pi_auth import pi_auth
 from app.db.session import get_db
-from app.models.models import User, Transaction, TransactionType
+from app.models.models import User, Transaction, TransactionType, UserRole
 from app.schemas.transaction import (
     TransactionCreate,
     TransactionUpdate,
@@ -125,7 +125,7 @@ def get_transactions(
     )
     
     # Regular users can only see their own transactions
-    if not current_user.is_admin:
+    if current_user.role != UserRole.ADMIN:
         filters.user_id = current_user.id
         
     transactions = crud_transaction.get_transactions(db, filters=filters, skip=skip, limit=limit)
@@ -145,7 +145,7 @@ def get_transaction(
     if transaction is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
         
-    if not current_user.is_admin and transaction.user_id != current_user.id:
+    if current_user.role != UserRole.ADMIN and transaction.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this transaction")
         
     return transaction
@@ -163,7 +163,7 @@ async def verify_transaction(
     if transaction is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
-    if not current_user.is_admin and transaction.user_id != current_user.id:
+    if current_user.role != UserRole.ADMIN and transaction.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to verify this transaction")
     
     if transaction.status != "pending":
@@ -198,18 +198,17 @@ async def verify_transaction(
             detail=f"Transaction verification failed: {str(e)}"
         )
 
-@router.put("/{transaction_id}", response_model=TransactionWithUser)
-def update_transaction(
+@router.put("/{transaction_id}", response_model=TransactionInDB)
+async def update_transaction(
     transaction_id: int,
     transaction_update: TransactionUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
-    Update a transaction.
-    Only admin users can update transactions.
+    Update a transaction (admin only).
     """
-    if not current_user.is_admin:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized to update transactions")
         
     transaction = crud_transaction.update_transaction(db, transaction_id, transaction_update)
@@ -228,7 +227,7 @@ def delete_transaction(
     Delete a transaction.
     Only admin users can delete transactions.
     """
-    if not current_user.is_admin:
+    if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized to delete transactions")
         
     transaction = crud_transaction.delete_transaction(db, transaction_id)
