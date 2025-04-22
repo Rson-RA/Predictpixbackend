@@ -27,13 +27,20 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-# CORS middleware configuration
+# CORS middleware configuration with explicit origins
+origins = [
+    "http://152.42.252.223:8000",  # Public IP
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Rate limiting middleware
