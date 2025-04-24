@@ -15,6 +15,8 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     user_id: int
     username: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     email: Optional[str] = None
     phone_number: Optional[str] = None
     role: UserRole

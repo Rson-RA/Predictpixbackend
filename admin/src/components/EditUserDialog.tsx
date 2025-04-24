@@ -17,7 +17,7 @@ import { styled } from '@mui/material/styles';
 import { User } from '../types/auth';
 import { updateUserAvatar } from '../api/users';
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 const Input = styled('input')({
   display: 'none',

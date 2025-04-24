@@ -108,7 +108,7 @@ const Markets = () => {
       // Validate percentage range
       if (numValue < 0) value = 0;
       if (numValue > 5) value = 5;
-      value = Number(numValue.toFixed(1)); // Limit to one decimal place
+      value = Number(numValue?.toFixed(1)); // Limit to one decimal place
     }
     
     setFormData({ ...formData, [field]: value });
@@ -210,8 +210,8 @@ const Markets = () => {
             0  // seconds
           )
         ).toISOString(),
-        creator_fee_percentage: Number(formData.creator_fee_percentage.toFixed(1)),
-        platform_fee_percentage: Number(formData.platform_fee_percentage.toFixed(1))
+        creator_fee_percentage: Number(formData.creator_fee_percentage?.toFixed(1)),
+        platform_fee_percentage: Number(formData.platform_fee_percentage?.toFixed(1))
       };
 
       console.log('Sending market data:', marketData);

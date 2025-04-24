@@ -125,9 +125,12 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
         "token_type": "bearer",
         "user_id": user.id,
         "username": user.username,
+        "first_name": user.firstname,
+        "last_name": user.lastname,
         "email": user.email,
         "phone_number": user.phone_number,
         "role": user.role,
+        "balance": user.balance,
         "avatar_url": user.avatar_url,
         "created_at": user.created_at,
         "updated_at": user.updated_at
@@ -164,8 +167,15 @@ async def login(auth_token: str, db: Session = Depends(get_db)):
             "access_token": access_token,
             "token_type": "bearer",
             "user_id": user.id,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "avatar_url": user.avatar_url,
             "username": user.username,
-            "role": user.role
+            "first_name": user.firstname,
+            "last_name": user.lastname,
+            "role": user.role,
+            "created_at": user.created_at,
+            "updated_at": user.updated_at
         }
     
     except Exception as e:

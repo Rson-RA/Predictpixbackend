@@ -108,7 +108,7 @@ const Referrals: React.FC = () => {
                 <Typography variant="h6">Total Earnings</Typography>
               </Box>
               <Typography variant="h4">
-                ${referralData.referral_earnings.toFixed(2)}
+                ${referralData.referral_earnings?.toFixed(2)}
               </Typography>
             </CardContent>
           </Card>
@@ -200,7 +200,7 @@ const Referrals: React.FC = () => {
                     </TableCell>
                     <TableCell>{tx.referred_user.username}</TableCell>
                     <TableCell>{tx.referred_user.email}</TableCell>
-                    <TableCell align="right">${tx.amount.toFixed(2)}</TableCell>
+                    <TableCell align="right">${tx.amount?.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
                 {transactions.length === 0 && (

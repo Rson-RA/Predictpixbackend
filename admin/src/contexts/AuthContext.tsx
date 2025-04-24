@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const validateToken = async (token: string): Promise<boolean> => {
     try {
-      const response = await axios.get('http://localhost:8000/api/auth/validate', {
+      const response = await axios.get(process.env.REACT_APP_API_URL + '/auth/validate', {
         headers: {
           Authorization: `Bearer ${token}`
         }
