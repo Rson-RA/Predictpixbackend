@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const userData: User = {
-        id: response.user_id,
+        id: response.id,
         username: response.username,
         email: response.email,
         role: response.role as 'admin' | 'user',
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const userData: User = {
-        id: response.user_id,
+        id: response.id,
         username: response.username,
         email: response.email,
         pi_user_id: auth.user.uid,
@@ -160,7 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const userData: User = {
-        id: response.user_id,
+        id: response.id,
         username: response.username,
         email: response.email,
         role: response.role as 'admin' | 'user',

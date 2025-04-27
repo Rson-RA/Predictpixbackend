@@ -11,6 +11,7 @@ class MarketBase(BaseModel):
     title: str
     description: str
     end_time: datetime
+    market_metadata: Optional[Dict[str, Any]] = None
     resolution_time: datetime
     creator_fee_percentage: float = Field(ge=0, le=5)
     platform_fee_percentage: float = Field(ge=0, le=5)
@@ -45,10 +46,10 @@ class MarketInDB(MarketBase):
     updated_at: datetime
     market_metadata: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
-        populate_by_name = True
-        alias_generator = lambda x: x.replace('market_metadata', 'metadata')
+    # class Config:
+    #     from_attributes = True
+    #     populate_by_name = True
+    #     alias_generator = lambda x: x.replace('market_metadata', 'metadata')
 
 class MarketWithStats(MarketInDB):
     total_predictions: int

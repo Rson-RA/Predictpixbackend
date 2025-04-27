@@ -48,7 +48,7 @@ export const getMarket = async (id: number): Promise<Market> => {
 
 // Create a new market
 export const createMarket = async (data: CreateMarketData): Promise<Market> => {
-  const response = await api.post<Market>('/markets', data);
+  const response = await api.post<Market>('/markets/create', data);
   return response.data;
 };
 

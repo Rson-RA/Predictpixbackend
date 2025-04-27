@@ -97,7 +97,7 @@ def convert_market_to_dict(market: PredictionMarket) -> dict:
         **creator_info
     }
 
-@router.post("/", response_model=MarketInDB)
+@router.post("/create", response_model=MarketInDB)
 async def create_market(
     market: MarketCreate,
     db: Session = Depends(get_db),
@@ -146,20 +146,20 @@ async def create_market(
     
     try:
         # Create market on blockchain
-        blockchain_result = web3_service.create_market(
-            title=market.title,
-            description=market.description,
-            end_time=market.end_time,
-            resolution_time=market.resolution_time,
-            creator_fee_percentage=int(market.creator_fee_percentage),
-            platform_fee_percentage=int(market.platform_fee_percentage),
-            private_key=os.getenv("ADMIN_PRIVATE_KEY")  # Admin key for market creation
-        )
-        # blockchain_result = {
-        #     "market_id": 1,
-        #     "transaction_hash": "0x1234567890abcdef",
-        #     "block_number": 1234567890
-        # }
+        # blockchain_result = web3_service.create_market(
+        #     title=market.title,
+        #     description=market.description,
+        #     end_time=market.end_time,
+        #     resolution_time=market.resolution_time,
+        #     creator_fee_percentage=int(market.creator_fee_percentage),
+        #     platform_fee_percentage=int(market.platform_fee_percentage),
+        #     private_key=os.getenv("ADMIN_PRIVATE_KEY")  # Admin key for market creation
+        # )
+        blockchain_result = {
+            "market_id": 1,
+            "transaction_hash": "0x1234567890abcdef",
+            "block_number": 1234567890
+        }
         
         # Create market in database
         market_data = market.model_dump()
@@ -174,7 +174,8 @@ async def create_market(
                 "market_id": blockchain_result["market_id"],
                 "transaction_hash": blockchain_result["transaction_hash"],
                 "block_number": blockchain_result["block_number"]
-            }
+            },
+            "market": market.market_metadata
         }
         
         db_market = PredictionMarket(
@@ -209,6 +210,7 @@ async def list_markets(
     """
     List prediction markets with optional filtering.
     """
+    print(f"Listing markets with status: {status}")
     query = db.query(PredictionMarket)\
         .options(joinedload(PredictionMarket.creator))\
         .order_by(PredictionMarket.created_at.desc())

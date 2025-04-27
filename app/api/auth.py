@@ -71,7 +71,7 @@ async def register(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user_id": db_user.id,
+        "id": db_user.id,
         "username": db_user.username,
         "email": db_user.email,
         "role": db_user.role,
@@ -123,7 +123,7 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user_id": user.id,
+        "id": user.id,
         "username": user.username,
         "first_name": user.firstname,
         "last_name": user.lastname,

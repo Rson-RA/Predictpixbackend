@@ -105,7 +105,7 @@ const Referrals: React.FC = () => {
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <MonetizationOnIcon color="primary" sx={{ mr: 1 }} />
-                <Typography variant="h6">Total Earnings</Typography>
+                <Typography variant="h6">Total Pi Rewards</Typography>
               </Box>
               <Typography variant="h4">
                 ${referralData.referral_earnings?.toFixed(2)}

@@ -16,7 +16,7 @@ interface RegisterCredentials {
 }
 
 interface LoginResponse {
-  user_id: number;
+  id: number;
   access_token: string;
   token_type: string;
   username: string;

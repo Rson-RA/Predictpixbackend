@@ -7,8 +7,7 @@ from app.schemas.market import MarketInDB
 class PredictionBase(BaseModel):
     amount: float
     predicted_outcome: str
-    status: str
-    metadata: Optional[Dict[str, Any]] = None
+    # metadata: Optional[Dict[str, Any]] = None
 
 class PredictionCreate(PredictionBase):
     market_id: int

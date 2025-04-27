@@ -9,7 +9,7 @@ from app.core.config import settings
 
 router = APIRouter()
 
-@router.post("/", response_model=PredictionInDB)
+@router.post("/create", response_model=PredictionInDB)
 async def create_prediction(
     prediction: PredictionCreate,
     db: Session = Depends(get_db),
@@ -40,8 +40,8 @@ async def create_prediction(
         )
     
     # Validate outcome option
-    if prediction.predicted_outcome not in market.outcome_options:
-        raise HTTPException(status_code=400, detail="Invalid outcome option")
+    # if prediction.predicted_outcome not in market.outcome_options:
+    #     raise HTTPException(status_code=400, detail="Invalid outcome option")
     
     # Check user balance
     if current_user.balance < prediction.amount:
@@ -59,6 +59,8 @@ async def create_prediction(
     
     # Update market total pool
     market.total_pool += prediction.amount
+    market.yes_pool += prediction.amount if prediction.predicted_outcome == 'yes' else 0
+    market.no_pool += prediction.amount if prediction.predicted_outcome == 'no' else 0
     
     db.add(db_prediction)
     db.commit()
@@ -107,7 +109,7 @@ async def list_predictions(
             "amount": prediction.amount,
             "predicted_outcome": prediction.predicted_outcome,
             "status": prediction.status,
-            "metadata": prediction.metadata,
+            # "metadata": prediction.metadata,
             "created_at": prediction.created_at,
             "updated_at": prediction.updated_at,
             "market": prediction.market
@@ -146,7 +148,7 @@ async def list_my_predictions(
             "amount": prediction.amount,
             "predicted_outcome": prediction.predicted_outcome,
             "status": prediction.status,
-            "metadata": prediction.metadata,
+            # "metadata": prediction.metadata,
             "created_at": prediction.created_at,
             "updated_at": prediction.updated_at,
             "market": prediction.market
