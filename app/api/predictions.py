@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List
-from app.core.security import get_current_active_user
+from app.core.security import get_current_active_user, get_current_admin_user
 from app.db.session import get_db
 from app.models.models import User, Prediction, PredictionMarket, MarketStatus, PredictionStatus
 from app.schemas.prediction import PredictionCreate, PredictionInDB, PredictionWithMarket, PredictionFilter
 from app.core.config import settings
+from datetime import datetime
 
 router = APIRouter()
 
@@ -61,6 +62,8 @@ async def create_prediction(
     market.total_pool += prediction.amount
     market.yes_pool += prediction.amount if prediction.predicted_outcome == 'yes' else 0
     market.no_pool += prediction.amount if prediction.predicted_outcome == 'no' else 0
+
+    # TODO: create transaction for prediction
     
     db.add(db_prediction)
     db.commit()
@@ -81,6 +84,7 @@ async def list_predictions(
     """
     query = db.query(Prediction)\
         .options(joinedload(Prediction.market))\
+        .options(joinedload(Prediction.user))\
         .order_by(Prediction.created_at.desc())
 
     # Apply filters
@@ -112,7 +116,8 @@ async def list_predictions(
             # "metadata": prediction.metadata,
             "created_at": prediction.created_at,
             "updated_at": prediction.updated_at,
-            "market": prediction.market
+            "market": prediction.market,
+            "creator": prediction.user
         }
         result.append(prediction_dict)
 
@@ -182,4 +187,50 @@ async def get_prediction(
         "market_end_time": market.end_time
     })
     
-    return PredictionWithMarket(**pred_dict) 
+    return PredictionWithMarket(**pred_dict)
+
+@router.put("/{prediction_id}/status", response_model=PredictionWithMarket)
+async def update_prediction_status(
+    prediction_id: int,
+    status: PredictionStatus,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_admin_user)
+):
+    """
+    Update prediction status (admin only).
+    """
+    prediction = db.query(Prediction).filter(Prediction.id == prediction_id).first()
+    if not prediction:
+        raise HTTPException(status_code=404, detail="Prediction not found")
+
+    # Update prediction status
+    prediction.status = status
+    prediction.updated_at = datetime.utcnow()
+
+    # If prediction is cancelled, refund the user
+    if status == PredictionStatus.CANCELLED:
+        prediction.user.balance += prediction.amount
+        
+        # Update market pools
+        market = prediction.market
+        market.total_pool -= prediction.amount
+        if prediction.predicted_outcome == "YES":
+            market.yes_pool -= prediction.amount
+        else:
+            market.no_pool -= prediction.amount
+
+    db.commit()
+    db.refresh(prediction)
+
+    # Return prediction with market info
+    return {
+        "id": prediction.id,
+        "user_id": prediction.user_id,
+        "market_id": prediction.market_id,
+        "amount": prediction.amount,
+        "predicted_outcome": prediction.predicted_outcome,
+        "status": prediction.status,
+        "created_at": prediction.created_at,
+        "updated_at": prediction.updated_at,
+        "market": prediction.market
+    } 

@@ -87,7 +87,6 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
     logger.debug(f"Attempting login with email: {credentials.email}")
     
     user = db.query(User).filter(User.email == credentials.email).first()
-    logger.debug(f"Found user: {user.username if user else None}")
     
     if not user:
         logger.warning(f"Login attempt failed: User not found for email {credentials.email}")
@@ -95,6 +94,8 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
             status_code=401,
             detail="Incorrect email or password"
         )
+
+    logger.debug(f"Found user: {user.username}")
     
     if not user.hashed_password:
         logger.warning(f"Login attempt failed: User {user.username} has no password set")

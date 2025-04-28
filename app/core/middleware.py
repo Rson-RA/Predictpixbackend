@@ -38,6 +38,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             logger.warning("Redis not available, using in-memory rate limiting")
 
     async def dispatch(self, request: Request, call_next):
+        # Skip rate limiting for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Get client IP
         client_ip = request.client.host
         

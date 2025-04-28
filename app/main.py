@@ -32,9 +32,19 @@ origins = [
     "http://152.42.252.223:8000",  # Public IP
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://localhost:8081"
+    "http://localhost:8081",
+    "http://localhost:3000",
+    "http://localhost:5173",  # Vite default port
+    "http://127.0.0.1:5173",
+    "http://localhost",
+    "http://127.0.0.1"
 ]
 
+# Add any additional origins from settings
+if settings.ALLOWED_ORIGINS:
+    origins.extend(settings.ALLOWED_ORIGINS)
+
+# CORS middleware must be first to handle preflight requests
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -42,9 +52,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
-# Rate limiting middleware
+# Rate limiting middleware comes after CORS
 app.add_middleware(RateLimitMiddleware)
 
 # Include API router first

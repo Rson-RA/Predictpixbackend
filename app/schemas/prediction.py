@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from app.models.models import PredictionStatus
 from app.schemas.market import MarketInDB
+from app.schemas.user import UserBase
 
 class PredictionBase(BaseModel):
     amount: float
@@ -20,8 +21,10 @@ class PredictionInDB(PredictionBase):
     id: int
     user_id: int
     market_id: int
+    status: PredictionStatus
     created_at: datetime
     updated_at: datetime
+    creator: UserBase
 
     class Config:
         from_attributes = True
