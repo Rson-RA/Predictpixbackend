@@ -175,7 +175,7 @@ async def create_market(
                 "transaction_hash": blockchain_result["transaction_hash"],
                 "block_number": blockchain_result["block_number"]
             },
-            "market": market.market_metadata
+            "market": market.metadata
         }
         
         db_market = PredictionMarket(

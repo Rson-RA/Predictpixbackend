@@ -11,12 +11,13 @@ class MarketBase(BaseModel):
     title: str
     description: str
     end_time: datetime
-    market_metadata: Optional[Dict[str, Any]] = None
+    #market_metadata: Optional[Dict[str, Any]] = None
     resolution_time: datetime
     creator_fee_percentage: float = Field(ge=0, le=5)
     platform_fee_percentage: float = Field(ge=0, le=5)
 
 class MarketCreate(MarketBase):
+    metadata: Optional[Dict[str, Any]] = None
     pass
 
 class MarketUpdate(BaseModel):
