@@ -13,7 +13,6 @@ from app.schemas.transaction import (
     TransactionWithUser,
     TransactionFilter
 )
-from app.crud import transaction as crud_transaction
 
 router = APIRouter()
 
@@ -116,20 +115,37 @@ def get_transactions(
     Get all transactions with optional filtering.
     Only admin users can see all transactions, regular users can only see their own.
     """
-    filters = TransactionFilter(
-        user_id=user_id,
-        status=status,
-        start_date=start_date,
-        end_date=end_date,
-        type=transaction_type
-    )
-    
-    # Regular users can only see their own transactions
+    query = db.query(Transaction)
+    if user_id:
+        query = query.filter(Transaction.user_id == user_id)
+    if status:
+        query = query.filter(Transaction.status == status)
+    if start_date:
+        query = query.filter(Transaction.created_at >= start_date)
+    if end_date:
+        query = query.filter(Transaction.created_at <= end_date)
+    if transaction_type:
+        query = query.filter(Transaction.transaction_type == transaction_type)
     if current_user.role != UserRole.ADMIN:
-        filters.user_id = current_user.id
-        
-    transactions = crud_transaction.get_transactions(db, filters=filters, skip=skip, limit=limit)
-    return transactions
+        query = query.filter(Transaction.user_id == current_user.id)
+    transactions = query.offset(skip).limit(limit).all()
+    # Attach user as dict for TransactionWithUser
+    result = []
+    for tx in transactions:
+        tx_dict = tx.__dict__.copy()
+        tx_dict.pop('_sa_instance_state', None)
+        tx_dict['user'] = {
+            'id': tx.user.id,
+            'username': tx.user.username,
+            'email': tx.user.email,
+            'role': tx.user.role,
+            'is_active': tx.user.is_active,
+            'avatar_url': tx.user.avatar_url,
+            'firstname': tx.user.firstname,
+            'lastname': tx.user.lastname
+        } if tx.user else None
+        result.append(tx_dict)
+    return result
 
 @router.get("/{transaction_id}", response_model=TransactionWithUser)
 def get_transaction(
@@ -141,14 +157,24 @@ def get_transaction(
     Get a specific transaction by ID.
     Only admin users can see all transactions, regular users can only see their own.
     """
-    transaction = crud_transaction.get_transaction(db, transaction_id)
-    if transaction is None:
+    tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
-        
-    if current_user.role != UserRole.ADMIN and transaction.user_id != current_user.id:
+    if current_user.role != UserRole.ADMIN and tx.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to access this transaction")
-        
-    return transaction
+    tx_dict = tx.__dict__.copy()
+    tx_dict.pop('_sa_instance_state', None)
+    tx_dict['user'] = {
+        'id': tx.user.id,
+        'username': tx.user.username,
+        'email': tx.user.email,
+        'role': tx.user.role,
+        'is_active': tx.user.is_active,
+        'avatar_url': tx.user.avatar_url,
+        'firstname': tx.user.firstname,
+        'lastname': tx.user.lastname
+    } if tx.user else None
+    return tx_dict
 
 @router.post("/verify/{transaction_id}", response_model=TransactionInDB)
 async def verify_transaction(
@@ -159,7 +185,7 @@ async def verify_transaction(
     """
     Verify a pending transaction with Pi Network.
     """
-    transaction = crud_transaction.get_transaction(db, transaction_id)
+    transaction = db.query(Transaction).filter(Transaction.id == transaction_id).first()
     if transaction is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
     
@@ -210,12 +236,14 @@ async def update_transaction(
     """
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized to update transactions")
-        
-    transaction = crud_transaction.update_transaction(db, transaction_id, transaction_update)
-    if transaction is None:
+    tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
-        
-    return transaction
+    for field, value in transaction_update.dict(exclude_unset=True).items():
+        setattr(tx, field, value)
+    db.commit()
+    db.refresh(tx)
+    return tx
 
 @router.delete("/{transaction_id}")
 def delete_transaction(
@@ -229,9 +257,9 @@ def delete_transaction(
     """
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not authorized to delete transactions")
-        
-    transaction = crud_transaction.delete_transaction(db, transaction_id)
-    if transaction is None:
+    tx = db.query(Transaction).filter(Transaction.id == transaction_id).first()
+    if tx is None:
         raise HTTPException(status_code=404, detail="Transaction not found")
-        
+    db.delete(tx)
+    db.commit()
     return {"message": "Transaction deleted successfully"} 

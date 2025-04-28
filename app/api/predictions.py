@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 from app.core.security import get_current_active_user, get_current_admin_user
 from app.db.session import get_db
-from app.models.models import User, Prediction, PredictionMarket, MarketStatus, PredictionStatus
+from app.models.models import User, Prediction, PredictionMarket, MarketStatus, PredictionStatus, Transaction, TransactionType, TransactionStatus
 from app.schemas.prediction import PredictionCreate, PredictionInDB, PredictionWithMarket, PredictionFilter
 from app.core.config import settings
 from datetime import datetime
@@ -63,13 +63,81 @@ async def create_prediction(
     market.yes_pool += prediction.amount if prediction.predicted_outcome == 'yes' else 0
     market.no_pool += prediction.amount if prediction.predicted_outcome == 'no' else 0
 
-    # TODO: create transaction for prediction
-    
+    # Create transaction for prediction
     db.add(db_prediction)
+    db.flush()  # To get db_prediction.id
+    prediction_tx = Transaction(
+        user_id=current_user.id,
+        amount=prediction.amount,
+        status=TransactionStatus.PENDING,
+        transaction_type=TransactionType.PREDICTION,
+        reference_id=str(db_prediction.id),
+        transaction_metadata={
+            "market_id": prediction.market_id,
+            "predicted_outcome": prediction.predicted_outcome
+        }
+    )
+    db.add(prediction_tx)
+    
     db.commit()
     db.refresh(db_prediction)
-    
-    return db_prediction
+    # Attach creator field for response validation
+    creator_dict = {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+        "avatar_url": current_user.avatar_url,
+        "firstname": current_user.firstname,
+        "lastname": current_user.lastname
+    }
+    user_dict = {
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role,
+        "is_active": current_user.is_active,
+        "avatar_url": current_user.avatar_url,
+        "firstname": current_user.firstname,
+        "lastname": current_user.lastname
+    }
+    # Serialize market to match MarketInDB schema
+    market = db_prediction.market
+    if market:
+        market_dict = {
+            "id": market.id,
+            "creator_id": market.creator_id,
+            "creator": {"id": market.creator.id if market.creator else None, "username": market.creator.username if market.creator else ""},
+            "title": market.title,
+            "description": market.description,
+            "end_time": market.end_time.isoformat() if market.end_time else None,
+            "resolution_time": market.resolution_time.isoformat() if market.resolution_time else None,
+            "creator_fee_percentage": market.creator_fee_percentage,
+            "platform_fee_percentage": market.platform_fee_percentage,
+            "status": market.status,
+            "total_pool": market.total_pool,
+            "yes_pool": market.yes_pool,
+            "no_pool": market.no_pool,
+            "correct_outcome": market.correct_outcome,
+            "created_at": market.created_at.isoformat() if market.created_at else None,
+            "updated_at": market.updated_at.isoformat() if market.updated_at else None,
+            "market_metadata": dict(market.market_metadata) if market.market_metadata else None
+        }
+    else:
+        market_dict = None
+    response_dict = {
+        **db_prediction.__dict__,
+        "creator": creator_dict,
+        "market": market_dict,
+        # Ensure datetimes are serializable
+        "created_at": db_prediction.created_at.isoformat() if db_prediction.created_at else None,
+        "updated_at": db_prediction.updated_at.isoformat() if db_prediction.updated_at else None
+    }
+    # Remove SQLAlchemy state if present
+    response_dict.pop('_sa_instance_state', None)
+    response_dict.pop('user', None)
+    return response_dict
 
 @router.get("/", response_model=List[PredictionWithMarket])
 async def list_predictions(
@@ -106,6 +174,41 @@ async def list_predictions(
     # Convert to response format
     result = []
     for prediction in predictions:
+        user = prediction.user
+        user_dict = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+            "avatar_url": user.avatar_url,
+            "firstname": user.firstname,
+            "lastname": user.lastname
+        } if user else None
+        # Serialize market to match MarketInDB schema
+        market = prediction.market
+        if market:
+            market_dict = {
+                "id": market.id,
+                "creator_id": market.creator_id,
+                "creator": {"id": market.creator.id if market.creator else None, "username": market.creator.username if market.creator else ""},
+                "title": market.title,
+                "description": market.description,
+                "end_time": market.end_time.isoformat() if market.end_time else None,
+                "resolution_time": market.resolution_time.isoformat() if market.resolution_time else None,
+                "creator_fee_percentage": market.creator_fee_percentage,
+                "platform_fee_percentage": market.platform_fee_percentage,
+                "status": market.status,
+                "total_pool": market.total_pool,
+                "yes_pool": market.yes_pool,
+                "no_pool": market.no_pool,
+                "correct_outcome": market.correct_outcome,
+                "created_at": market.created_at.isoformat() if market.created_at else None,
+                "updated_at": market.updated_at.isoformat() if market.updated_at else None,
+                "market_metadata": dict(market.market_metadata) if market.market_metadata else None
+            }
+        else:
+            market_dict = None
         prediction_dict = {
             "id": prediction.id,
             "user_id": prediction.user_id,
@@ -114,10 +217,10 @@ async def list_predictions(
             "predicted_outcome": prediction.predicted_outcome,
             "status": prediction.status,
             # "metadata": prediction.metadata,
-            "created_at": prediction.created_at,
-            "updated_at": prediction.updated_at,
-            "market": prediction.market,
-            "creator": prediction.user
+            "created_at": prediction.created_at.isoformat() if prediction.created_at else None,
+            "updated_at": prediction.updated_at.isoformat() if prediction.updated_at else None,
+            "market": market_dict,
+            "creator": user_dict
         }
         result.append(prediction_dict)
 

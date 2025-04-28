@@ -168,8 +168,8 @@ class Transaction(Base):
     tx_hash = Column(String)  # Pi Network transaction hash
     reference_id = Column(String)  # Reference to prediction/market ID
     transaction_metadata = Column(JSON)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="transactions")

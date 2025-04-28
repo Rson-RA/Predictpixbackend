@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
 import Typography from '@mui/material/Typography';
@@ -20,49 +20,65 @@ import ShowChartIcon from '@mui/icons-material/ShowChart';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckIcon from '@mui/icons-material/Check';
 import { useTheme } from '@mui/material/styles';
+import { getMarkets, Market } from '../api/markets';
 
 const Dashboard = () => {
   const theme = useTheme();
   const [timeRange, setTimeRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with real API calls
-  const stats = {
-    totalMarkets: 156,
-    activeMarkets: 42,
-    totalVolume: 25420,
-    todayVolume: 1245,
-    successRate: 78,
-  };
+  // Stats state
+  const [stats, setStats] = useState({
+    totalMarkets: 0,
+    activeMarkets: 0,
+    totalVolume: 0,
+    todayVolume: 0,
+    successRate: 0,
+  });
+  const [topMarkets, setTopMarkets] = useState<any[]>([]);
 
-  const topMarkets = [
-    {
-      id: 1,
-      title: "Will BTC reach $100k by end of 2024?",
-      volume: 5240,
-      yesPool: 3240,
-      noPool: 2000,
-      endTime: "2024-12-31",
-      status: "active",
-    },
-    {
-      id: 2,
-      title: "Will Ethereum 2.0 launch in Q2?",
-      volume: 3150,
-      yesPool: 2150,
-      noPool: 1000,
-      endTime: "2024-06-30",
-      status: "active",
-    },
-    {
-      id: 3,
-      title: "Will Pi Network reach mainnet in 2024?",
-      volume: 2840,
-      yesPool: 1540,
-      noPool: 1300,
-      endTime: "2024-12-31",
-      status: "active",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const data = await getMarkets();
+        setMarkets(data);
+        // Compute stats
+        const totalMarkets = data.length;
+        const activeMarkets = data.filter(m => m.status === 'active').length;
+        const totalVolume = data.reduce((sum, m) => sum + m.total_pool, 0);
+        // For todayVolume, filter by created_at (today)
+        const today = new Date();
+        const todayVolume = data.filter(m => {
+          const created = new Date(m.created_at);
+          return created.getFullYear() === today.getFullYear() &&
+            created.getMonth() === today.getMonth() &&
+            created.getDate() === today.getDate();
+        }).reduce((sum, m) => sum + m.total_pool, 0);
+        // Success rate: percent of closed/settled/closed+active
+        const resolvedMarkets = data.filter(m => m.status === 'closed' || m.status === 'settled').length;
+        const successRate = totalMarkets > 0 ? Math.round((resolvedMarkets / totalMarkets) * 100) : 0;
+        setStats({ totalMarkets, activeMarkets, totalVolume, todayVolume, successRate });
+        // Top markets by volume
+        const sorted = [...data].sort((a, b) => b.total_pool - a.total_pool).slice(0, 3);
+        setTopMarkets(sorted.map(m => ({
+          id: m.id,
+          title: m.title,
+          volume: m.total_pool,
+          yesPool: m.yes_pool,
+          noPool: m.no_pool,
+          endTime: m.end_time,
+          status: m.status,
+        })));
+      } catch (e) {
+        // handle error
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [timeRange]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
