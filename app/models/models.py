@@ -38,6 +38,7 @@ class TransactionType(str, enum.Enum):
     REWARD = "reward"
     PREDICTION = "prediction"
     REFERRAL = "referral"
+    MARKET_CREATION = "market_creation"
 
 class RewardStatus(str, enum.Enum):
     PENDING = "pending"

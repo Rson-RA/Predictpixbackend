@@ -238,6 +238,7 @@ const Predictions = () => {
                           '& .MuiSelect-icon': { color: '#fff' }
                         }}
                       >
+                        <MenuItem value="active">Active</MenuItem>
                         <MenuItem value="pending">Pending</MenuItem>
                         <MenuItem value="won">Won</MenuItem>
                         <MenuItem value="lost">Lost</MenuItem>

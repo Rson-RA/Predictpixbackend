@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Dict
 from app.core.security import get_current_active_user, get_current_admin_user
 from app.db.session import get_db
-from app.models.models import User, PredictionMarket, MarketStatus, UserRole, Prediction, Reward
+from app.models.models import User, PredictionMarket, MarketStatus, UserRole, Prediction, Reward, Transaction, TransactionType, TransactionStatus
 from app.schemas.market import MarketCreate, MarketUpdate, MarketInDB, MarketWithStats, MarketReject
 from app.core.settlement import process_market_settlement
 from app.core.pi_payments import process_market_rewards, process_pending_transactions
@@ -189,6 +189,24 @@ async def create_market(
         db.commit()
         db.refresh(db_market)
         
+        # Add transaction for market creation
+        market_creation_tx = Transaction(
+            user_id=current_user.id,
+            amount=None,  # No direct amount for market creation
+            status=TransactionStatus.PENDING,
+            transaction_type=TransactionType.MARKET_CREATION,
+            tx_hash=blockchain_result["transaction_hash"],
+            reference_id=str(db_market.id),
+            transaction_metadata={
+                "blockchain": market_metadata["blockchain"],
+                "market": market_metadata["market"],
+                "creation_timestamp": now.isoformat(),
+            }
+        )
+        db.add(market_creation_tx)
+        db.commit()
+        db.refresh(market_creation_tx)
+        
         # Convert to response format
         response_data = db_market.to_dict()
         return response_data
@@ -356,13 +374,16 @@ async def place_prediction(
     
     try:
         # Place prediction on blockchain
-        blockchain_result = web3_service.place_prediction(
-            market_id=db_market.market_metadata["blockchain"]["market_id"],
-            predicted_outcome=predicted_outcome,
-            amount=amount,
-            private_key=current_user.private_key  # User's private key for prediction
-        )
-        
+        # blockchain_result = web3_service.place_prediction(
+        #     market_id=db_market.market_metadata["blockchain"]["market_id"],
+        #     predicted_outcome=predicted_outcome,
+        #     amount=amount,
+        #     private_key=current_user.private_key  # User's private key for prediction
+        # )
+        blockchain_result = {
+            "transaction_hash": "0x1234567890abcdef",
+            "block_number": 1234567890
+        }
         # Create prediction in database
         db_prediction = Prediction(
             user_id=current_user.id,
