@@ -11,9 +11,11 @@ from app.core.web3_service import Web3Service
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, ROUND_DOWN
 import os
+from app.core.socket import SocketManager
 
 router = APIRouter()
 web3_service = Web3Service()
+socket_manager = SocketManager()
 
 def calculate_market_odds(market: PredictionMarket) -> dict:
     """
@@ -349,6 +351,7 @@ async def update_market(
     
     db.commit()
     db.refresh(db_market)
+    socket_manager.broadcast_to_all(f"Market {db_market.id} updated")
     return db_market.to_dict()
 
 @router.post("/{market_id}/predict", response_model=Dict)
@@ -390,7 +393,7 @@ async def place_prediction(
             market_id=market_id,
             amount=float(amount),
             predicted_outcome="YES" if predicted_outcome else "NO",
-            status="active",
+            status="pending",
             metadata={
                 "blockchain": {
                     "transaction_hash": blockchain_result["transaction_hash"],

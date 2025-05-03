@@ -13,6 +13,11 @@ class MarketType(str, enum.Enum):
     BINARY = "binary"
     MULTIPLE = "multiple"
 
+class MarketTier(str, enum.Enum):
+    BASIC = "basic"
+    TRUSTED = "trusted"
+    PARTNER = "partner"
+
 class MarketStatus(str, enum.Enum):
     PENDING = "pending"
     ACTIVE = "active"
@@ -100,6 +105,7 @@ class PredictionMarket(Base):
     end_time = Column(DateTime, nullable=False)
     resolution_time = Column(DateTime, nullable=False)
     status = Column(Enum(MarketStatus), default=MarketStatus.PENDING)
+    tier = Column(Enum(MarketTier), default=MarketTier.BASIC)
     total_pool = Column(Float, default=0.0)
     yes_pool = Column(Float, default=0.0)  # Total amount bet on YES
     no_pool = Column(Float, default=0.0)   # Total amount bet on NO
@@ -125,6 +131,7 @@ class PredictionMarket(Base):
             "end_time": self.end_time,
             "resolution_time": self.resolution_time,
             "status": self.status,
+            "tier": self.tier,
             "total_pool": self.total_pool,
             "yes_pool": self.yes_pool,
             "no_pool": self.no_pool,

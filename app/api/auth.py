@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.pi_auth import pi_auth
-from app.core.security import create_access_token, verify_password, get_password_hash, oauth2_scheme, SECRET_KEY, ALGORITHM
+from app.core.security import create_access_token, create_refresh_token, verify_password, get_password_hash, oauth2_scheme, SECRET_KEY, ALGORITHM, verify_refresh_token
 from app.db.session import get_db
 from app.models.models import User, UserRole
 from app.schemas.auth import (
@@ -67,9 +67,11 @@ async def register(
 
     # Create access token
     access_token = create_access_token(subject=db_user.email)
+    refresh_token = create_refresh_token(subject=db_user.email)
     
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "id": db_user.id,
         "username": db_user.username,
@@ -119,10 +121,12 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
         )
     
     access_token = create_access_token(subject=str(user.id))
+    refresh_token = create_refresh_token(subject=str(user.id))
     logger.info(f"User {user.username} logged in successfully")
     
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "id": user.id,
         "username": user.username,
@@ -163,9 +167,11 @@ async def login(auth_token: str, db: Session = Depends(get_db)):
         
         # Create access token
         access_token = create_access_token(subject=user.pi_user_id)
+        refresh_token = create_refresh_token(subject=user.pi_user_id)
         
         return {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "user_id": user.id,
             "email": user.email,
@@ -225,9 +231,11 @@ async def admin_login(
         )
     
     access_token = create_access_token(subject=user.pi_user_id)
+    refresh_token = create_refresh_token(subject=user.pi_user_id)
     
     return {
         "access_token": access_token,
+        "refresh_token": refresh_token,
         "token_type": "bearer",
         "user_id": user.id,
         "username": user.username,
@@ -310,4 +318,32 @@ async def validate_token(token: str = Depends(oauth2_scheme)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication token"
-        ) 
+        )
+
+@router.post("/refresh", response_model=AuthResponse)
+async def refresh_token_endpoint(refresh_token: str, db: Session = Depends(get_db)):
+    """
+    Exchange a valid refresh token for a new access token.
+    """
+    user_id = verify_refresh_token(refresh_token)
+    user = db.query(User).filter((User.id == user_id) | (User.email == user_id) | (User.pi_user_id == user_id)).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    access_token = create_access_token(subject=str(user.id))
+    new_refresh_token = create_refresh_token(subject=str(user.id))
+    return {
+        "access_token": access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer",
+        "id": user.id,
+        "username": user.username,
+        "first_name": user.firstname,
+        "last_name": user.lastname,
+        "email": user.email,
+        "phone_number": user.phone_number,
+        "role": user.role,
+        "balance": getattr(user, "balance", None),
+        "avatar_url": getattr(user, "avatar_url", None),
+        "created_at": user.created_at,
+        "updated_at": user.updated_at
+    } 

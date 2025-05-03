@@ -12,6 +12,7 @@ class TokenData(BaseModel):
 
 class AuthResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
     id: int
     username: str
@@ -49,6 +50,7 @@ class UpdateUserRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
 
 class LoginRequest(BaseModel):

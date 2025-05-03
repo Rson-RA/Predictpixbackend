@@ -13,6 +13,7 @@ from passlib.context import CryptContext
 SECRET_KEY = "your-secret-key-keep-it-secret"  # In production, use a secure secret key from environment variables
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days for refresh token
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -38,6 +39,29 @@ def create_access_token(*, subject: str, expires_delta: Optional[timedelta] = No
     to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def create_refresh_token(*, subject: str, expires_delta: Optional[timedelta] = None) -> str:
+    """Create a new refresh token."""
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_refresh_token(token: str) -> str:
+    """Verify a refresh token and return the subject (user id/email)."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token type")
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        return user_id
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),

@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, validator
 from typing import Dict, Optional, Any
 from datetime import datetime
-from app.models.models import MarketStatus
+from app.models.models import MarketStatus, MarketTier
 
 class Creator(BaseModel):
     id: Optional[int] = None
@@ -11,7 +11,7 @@ class MarketBase(BaseModel):
     title: str
     description: str
     end_time: datetime
-    #market_metadata: Optional[Dict[str, Any]] = None
+    tier: Optional[MarketTier] = None
     resolution_time: datetime
     creator_fee_percentage: float = Field(ge=0, le=5)
     platform_fee_percentage: float = Field(ge=0, le=5)
