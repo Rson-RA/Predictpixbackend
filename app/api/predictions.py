@@ -199,6 +199,7 @@ async def list_predictions(
                 "creator_fee_percentage": market.creator_fee_percentage,
                 "platform_fee_percentage": market.platform_fee_percentage,
                 "status": market.status,
+                "tier": market.tier,
                 "total_pool": market.total_pool,
                 "yes_pool": market.yes_pool,
                 "no_pool": market.no_pool,

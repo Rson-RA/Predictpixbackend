@@ -68,4 +68,7 @@ class PiLoginRequest(BaseModel):
 class SignupRequest(BaseModel):
     email: EmailStr
     password: str
-    username: Optional[str] = None 
+    username: Optional[str] = None
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str 

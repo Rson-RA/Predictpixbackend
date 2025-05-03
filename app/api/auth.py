@@ -11,7 +11,8 @@ from app.schemas.auth import (
     UpdateUserRequest,
     SignupRequest,
     PiLoginRequest,
-    LoginRequest
+    LoginRequest,
+    RefreshTokenRequest
 )
 from app.core.security import get_current_user
 from fastapi.security import OAuth2PasswordRequestForm
@@ -321,11 +322,11 @@ async def validate_token(token: str = Depends(oauth2_scheme)):
         )
 
 @router.post("/refresh", response_model=AuthResponse)
-async def refresh_token_endpoint(refresh_token: str, db: Session = Depends(get_db)):
+async def refresh_token_endpoint(request: RefreshTokenRequest, db: Session = Depends(get_db)):
     """
     Exchange a valid refresh token for a new access token.
     """
-    user_id = verify_refresh_token(refresh_token)
+    user_id = verify_refresh_token(request.refresh_token)
     user = db.query(User).filter((User.id == user_id) | (User.email == user_id) | (User.pi_user_id == user_id)).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
