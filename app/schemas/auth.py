@@ -21,6 +21,8 @@ class AuthResponse(BaseModel):
     email: Optional[str] = None
     phone_number: Optional[str] = None
     role: UserRole
+    balance: float
+    referral_code: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
@@ -69,6 +71,7 @@ class SignupRequest(BaseModel):
     email: EmailStr
     password: str
     username: Optional[str] = None
+    referral_code: Optional[str] = None
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str 

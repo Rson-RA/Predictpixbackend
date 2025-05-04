@@ -28,6 +28,20 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: int
     balance: float
+    referral_code: str
+    total_predictions: int = 0
+    total_earnings: float = 0.0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        orm_mode = True 
+
+class UserPortfolioResponse(UserBase):
+    id: int
+    balance: float
+    referral_code: str
+    earnings_in_24h: str
     created_at: datetime
     updated_at: datetime
 

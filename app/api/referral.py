@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List
 import secrets
 import string
 from app.core.deps import get_db, get_current_user
 from app.models.models import User, ReferralTransaction, Transaction, TransactionType, TransactionStatus
-from app.schemas.referral import ReferralResponse, ReferralStats, ReferralTransactionResponse
+from app.schemas.referral import ReferralResponse, ReferralStats, ReferralTransactionResponse, ReferralHistoryResponse
 from app.core.config import settings
 
 router = APIRouter()
@@ -67,6 +67,38 @@ def get_referral_stats(
         "recent_referrals": recent_referrals
     }
 
+@router.get("/history", response_model=List[ReferralHistoryResponse])
+def get_referral_history(
+    skip: int = 0,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get user's referral history with pagination.
+    Returns a detailed list of referral transactions including referred user details
+    and associated transaction information.
+    """
+    transactions = (
+        db.query(ReferralTransaction)
+        .options(
+            joinedload(ReferralTransaction.referred_user),
+            joinedload(ReferralTransaction.transaction)
+        )
+        .filter(ReferralTransaction.user_id == current_user.id)
+        .order_by(ReferralTransaction.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    
+    # Ensure amount is never None
+    for tx in transactions:
+        if tx.amount is None:
+            tx.amount = 0.0
+    
+    return transactions
+
 @router.get("/transactions", response_model=List[ReferralTransactionResponse])
 def get_referral_transactions(
     skip: int = 0,
@@ -74,15 +106,28 @@ def get_referral_transactions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get user's referral transactions."""
+    """
+    Get user's referral transactions with pagination.
+    Returns a list of transactions including referred user details.
+    """
     transactions = (
         db.query(ReferralTransaction)
+        .options(
+            joinedload(ReferralTransaction.referred_user),
+            joinedload(ReferralTransaction.transaction)
+        )
         .filter(ReferralTransaction.user_id == current_user.id)
         .order_by(ReferralTransaction.created_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    
+    # Ensure amount is never None
+    for tx in transactions:
+        if tx.amount is None:
+            tx.amount = 0.0
+    
     return transactions
 
 async def process_referral(

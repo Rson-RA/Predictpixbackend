@@ -4,9 +4,12 @@ from datetime import datetime
 from app.models.models import TransactionStatus, TransactionType
 
 class TransactionBase(BaseModel):
-    amount: float
+    amount: Optional[float] = 0.0
     status: str = TransactionStatus.PENDING
     transaction_type: str
+
+    class Config:
+        from_attributes = True
 
 class TransactionCreate(TransactionBase):
     user_id: int

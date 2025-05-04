@@ -22,6 +22,9 @@ import jwt
 from jwt.exceptions import InvalidTokenError
 from datetime import datetime, timedelta
 from typing import Optional
+import secrets
+import string
+from app.api.referral import process_referral, generate_referral_code
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,6 @@ router = APIRouter()
 @router.post("/register", response_model=AuthResponse)
 async def register(
     user_data: SignupRequest,
-    referral_code: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Register a new user."""
@@ -43,20 +45,28 @@ async def register(
 
     # Check referral code if provided
     referrer = None
-    if referral_code:
-        referrer = db.query(User).filter(User.referral_code == referral_code).first()
+    if user_data.referral_code:
+        referrer = db.query(User).filter(User.referral_code == user_data.referral_code).first()
         if not referrer:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid referral code"
             )
 
+    # Generate unique referral code for new user
+    while True:
+        referral_code = generate_referral_code()
+        if not db.query(User).filter(User.referral_code == referral_code).first():
+            break
+
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     db_user = User(
-        **user_data.dict(exclude={'password'}),
+        **user_data.dict(exclude={'password', 'referral_code'}),
         hashed_password=hashed_password,
-        referred_by_id=referrer.id if referrer else None
+        referred_by_id=referrer.id if referrer else None,
+        referral_code=referral_code,
+        referral_earnings=0.0
     )
     db.add(db_user)
     db.commit()
@@ -67,8 +77,8 @@ async def register(
         await process_referral(db, db_user, referrer)
 
     # Create access token
-    access_token = create_access_token(subject=db_user.email)
-    refresh_token = create_refresh_token(subject=db_user.email)
+    access_token = create_access_token(subject=str(db_user.id))
+    refresh_token = create_refresh_token(subject=str(db_user.id))
     
     return {
         "access_token": access_token,
@@ -137,6 +147,7 @@ async def email_login(credentials: EmailLoginRequest | LoginRequest, db: Session
         "phone_number": user.phone_number,
         "role": user.role,
         "balance": user.balance,
+        "referral_code": user.referral_code,
         "avatar_url": user.avatar_url,
         "created_at": user.created_at,
         "updated_at": user.updated_at
