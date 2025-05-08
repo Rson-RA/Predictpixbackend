@@ -86,8 +86,16 @@ async def register(
         "token_type": "bearer",
         "id": db_user.id,
         "username": db_user.username,
+        "first_name": db_user.firstname,
+        "last_name": db_user.lastname,
         "email": db_user.email,
+        "phone_number": db_user.phone_number,
         "role": db_user.role,
+        "balance": db_user.balance,
+        "pi_user_id": db_user.pi_user_id,
+        "referral_earnings": db_user.referral_earnings,
+        "referral_code": db_user.referral_code,
+        "avatar_url": db_user.avatar_url,
         "created_at": db_user.created_at,
         "updated_at": db_user.updated_at
     }

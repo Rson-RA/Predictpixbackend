@@ -2,8 +2,8 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.schedulers.base import STATE_STOPPED
+# from apscheduler.schedulers.background import BackgroundScheduler
+# from apscheduler.schedulers.base import STATE_STOPPED
 import datetime
 from app.core.config import settings
 from app.core.middleware import RateLimitMiddleware
@@ -13,8 +13,8 @@ from app.db.utils import init_db
 import logging
 import os
 from dotenv import load_dotenv
-from app.core.jobs import resolve_due_markets, close_expired_markets
-from app.core.socket import SocketManager
+# from app.core.jobs import resolve_due_markets, close_expired_markets
+# from app.core.socket import SocketManager
 
 load_dotenv()
 
@@ -32,7 +32,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
 
-scheduler = BackgroundScheduler()
+# scheduler = BackgroundScheduler()
 
 # CORS middleware configuration with explicit origins
 origins = [
@@ -48,7 +48,8 @@ origins = [
     "http://10.0.2.2:8081",
     "http://10.0.2.2:3000",
     "http://10.0.2.2:5173",
-    "http://10.0.2.2:8000"
+    "http://10.0.2.2:8000",
+    "http://192.168.109.117:8000"
 ]
 
 # Add any additional origins from settings
@@ -83,23 +84,23 @@ app.mount("/static", StaticFiles(directory="admin/build/static"), name="static")
 
 # app.mount("/assets", StaticFiles(directory="frontend/dist/assets"), name="assets")
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    user_id = websocket.query_params.get("user_id")
-    socket_manager = SocketManager()
-    await socket_manager.connect(websocket, user_id)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await websocket.send_text(f"Message received: {data}")
-    except WebSocketDisconnect:
-        print("Client disconnected")
+# @app.websocket("/ws")
+# async def websocket_endpoint(websocket: WebSocket):
+#     user_id = websocket.query_params.get("user_id")
+#     socket_manager = SocketManager()
+#     await socket_manager.connect(websocket, user_id)
+#     try:
+#         while True:
+#             data = await websocket.receive_text()
+#             await websocket.send_text(f"Message received: {data}")
+#     except WebSocketDisconnect:
+#         print("Client disconnected")
 
-def check_unresolved_markets():
-    print(f"[{datetime.datetime.now()}] Checking unresolved markets...")
-    # Add logic here: check markets, resolve if needed, push updates
-    resolve_due_markets()
-    close_expired_markets()
+# def check_unresolved_markets():
+#     print(f"[{datetime.datetime.now()}] Checking unresolved markets...")
+#     # Add logic here: check markets, resolve if needed, push updates
+#     resolve_due_markets()
+#     close_expired_markets()
 
 @app.on_event("startup")
 async def startup_event():
@@ -119,18 +120,18 @@ async def startup_event():
         logger.error(f"Error during startup: {str(e)}")
         raise
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on application shutdown"""
-    try:
-        # Only attempt to shut down if the scheduler is running
-        if scheduler.state != STATE_STOPPED:
-            scheduler.shutdown(wait=False)
-            logger.info("Scheduler stopped successfully")
-    except Exception as e:
-        logger.error(f"Error during shutdown: {str(e)}")
-        # Don't raise the exception during shutdown to allow clean exit
-        pass
+# @app.on_event("shutdown")
+# async def shutdown_event():
+#     """Cleanup on application shutdown"""
+#     try:
+#         # Only attempt to shut down if the scheduler is running
+#         if scheduler.state != STATE_STOPPED:
+#             scheduler.shutdown(wait=False)
+#             logger.info("Scheduler stopped successfully")
+#     except Exception as e:
+#         logger.error(f"Error during shutdown: {str(e)}")
+#         # Don't raise the exception during shutdown to allow clean exit
+#         pass
     
 # Serve static React files
 # @app.get("/app")
@@ -142,6 +143,12 @@ async def shutdown_event():
 async def get_admin_app():
     # Return the index.html from the React build folder
     return FileResponse(os.path.join("admin", "build", "index.html"))
+
+# Serve static React files
+@app.get("/pi")
+async def get_pi():
+    # Return the index.html from the React build folder
+    return FileResponse(os.path.join("", "", "pi.html"))
 
 # # Serve static files (JS, CSS, etc.)
 # @app.get("/static/{file_path:path}")

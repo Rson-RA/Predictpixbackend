@@ -1,0 +1,37 @@
+<html>
+<head>
+  <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+</head>
+<body>
+  <script>
+    Pi.init({ version: "2.0", sandbox: true });
+
+    async function login() {
+      try {
+        console.log("login");
+        const scopes = ['username', 'payments', 'wallet_address'];
+        const { user, accessToken, wallet_address } = await Pi.authenticate(scopes, onIncompletePaymentFound);
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({user, accessToken, wallet_address}));
+        } else {
+          window.parent.postMessage(JSON.stringify({user, accessToken, wallet_address}));
+        }
+
+      } catch (err) {
+        console.error('Pi login failed', err);
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({error: err}));
+        } else {
+          window.parent.postMessage(JSON.stringify({error: err}));
+        }
+      }
+    }
+
+    function onIncompletePaymentFound(payment) {
+      console.log("Incomplete payment:", payment);
+    }
+
+    window.onload = login;
+  </script>
+</body>
+</html>

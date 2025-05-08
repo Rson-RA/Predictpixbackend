@@ -2,9 +2,20 @@ from sqlalchemy.orm import Session
 from app.models.models import User, UserRole
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.models.base import Base
+from app.db.session import engine
 import logging
 
 logger = logging.getLogger(__name__)
+
+def drop_all_tables():
+    """Drop all tables in the database"""
+    try:
+        Base.metadata.drop_all(bind=engine)
+        logger.info("All tables dropped successfully")
+    except Exception as e:
+        logger.error(f"Error dropping tables: {str(e)}")
+        raise
 
 def create_admin_user(db: Session) -> User:
     """
@@ -46,6 +57,14 @@ def init_db(db: Session) -> None:
     Currently only creates admin user.
     """
     try:
+        # Drop all existing tables
+        drop_all_tables()
+        
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+        
+        # Create admin user
         create_admin_user(db)
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")

@@ -66,7 +66,7 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.USER)
     balance = Column(Float, default=0.0)
     is_active = Column(Boolean, default=True)
-    referral_code = Column(String, unique=True, index=True)  # Unique referral code for this user
+    referral_code = Column(String, unique=True, index=True, nullable=True)  # Unique referral code for this user
     referral_earnings = Column(Float, default=0.0)  # Total earnings from referrals
     referred_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # User who referred this user
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
